@@ -12,7 +12,7 @@ description: Guía el ciclo de implementación de una HU en Azure DevOps: activa
 
 - [ ] Estado `Active` + comentario de inicio
 - [ ] Implementación según AC
-- [ ] `npm run build` exitoso
+- [ ] `pnpm run build` exitoso
 - [ ] Estado `Resolved` + comentario de cierre
 - [ ] Mención QA en HTML para validación
 
@@ -28,7 +28,7 @@ description: Guía el ciclo de implementación de una HU en Azure DevOps: activa
 ## Paso 2 — Desarrollo
 
 1. Cumplir Acceptance Criteria y stack del repo.
-2. Ejecutar `npm run build` (o el comando de build del monorepo).
+2. Ejecutar `pnpm run build` (o el comando de build del monorepo).
 3. Verificar criterios antes de cerrar.
 
 ## Paso 3 — Cierre técnico

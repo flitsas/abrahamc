@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Flit.Modules.IdentityVerification</RootNamespace>
+    <PublishAot>false</PublishAot>
+    <IsAotCompatible>false</IsAotCompatible>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Flit.SharedKernel\Flit.SharedKernel.csproj" />
+    <ProjectReference Include="..\Flit.Modules.ProceduresConfig\Flit.Modules.ProceduresConfig.csproj" />
+  </ItemGroup>
+</Project>

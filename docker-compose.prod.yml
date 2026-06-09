@@ -4,34 +4,32 @@
 # Create a .env file alongside it with the variables listed below.
 #
 # Required .env variables:
-#   DATABASE_URL   — full connection string to the host PostgreSQL
-#                    e.g. postgres://flit:password@host.docker.internal:5432/flit_prod
-#   CORS_ORIGIN    — public URL of the frontend (e.g. https://app.tudominio.com)
+#   ConnectionStrings__Core — full connection string to the host PostgreSQL
+#                             e.g. Host=host.docker.internal;Port=5432;Database=flit_prod;Username=flit;Password=***
+#   Cors__AllowedOrigins    — public URL of the frontend (e.g. https://app.tudominio.com)
 #
 # Optional .env variables:
-#   PUBLIC_PORT    — host port to expose (default: 80)
-#   LOG_LEVEL      — pino log level (default: info)
+#   PUBLIC_PORT             — host port to expose frontend (default: 8090)
+#   ASPNETCORE_ENVIRONMENT  — default: Production
 
 services:
-  backend:
-    image: ghcr.io/flitsas/flit-boilerplate/backend:latest
-    # host.docker.internal resolves to the host machine on Linux via extra_hosts below
+  core-api:
+    image: ghcr.io/flitsas/abrahamc/core-api:latest
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "127.0.0.1:3030:3030"
+      - "127.0.0.1:3030:8081"
     environment:
-      NODE_ENV: production
-      DATABASE_URL: ${DATABASE_URL}
-      PORT: 3030
-      CORS_ORIGIN: ${CORS_ORIGIN}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_URLS: http://+:8081
+      ConnectionStrings__Core: ${ConnectionStrings__Core}
+      Cors__AllowedOrigins: ${Cors__AllowedOrigins}
     restart: unless-stopped
 
   frontend:
-    image: ghcr.io/flitsas/flit-boilerplate/frontend:latest
+    image: ghcr.io/flitsas/abrahamc/frontend:latest
     ports:
       - "127.0.0.1:${PUBLIC_PORT:-8090}:80"
     depends_on:
-      - backend
+      - core-api
     restart: unless-stopped

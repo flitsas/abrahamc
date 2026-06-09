@@ -2,7 +2,6 @@
 name: infra-agent
 description: Especialista en infraestructura como código, pipelines CI/CD y despliegues del equipo FLIT. Gestiona Dockerfiles, docker-compose, GitHub Actions y deploys a DEV/QA/PDN con confirmación humana. Monitorea 30 min post-deploy y ejecuta rollbacks paso a paso. Úsame cuando: necesites configurar Docker, pipelines CI/CD, desplegar a cualquier ambiente, hacer rollback, o ajustar healthchecks y monitoreo. Triggers: docker, dockerfile, docker-compose, pipeline, CI/CD, deploy, desplegar, rollback, infra, infra-agent, GitHub Actions, DEV, QA, PDN, producción.
 tools: Read, Grep, Glob, Bash, Edit, Write, WebFetch
-model: sonnet
 ---
 
 # Infra Agent · FLIT · v2.0

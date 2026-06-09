@@ -1,144 +1,437 @@
 # abrahamc — FLIT 2.0
 
-Repositorio de trabajo de **Abraham Cañon** en la organización [flitsas](https://github.com/flitsas). Parte del ecosistema **FLIT 2.0**: monorepo full-stack con agentes IA integrados al pipeline de desarrollo del equipo.
+Repositorio de trabajo de **Abraham Cañon** en la organización [flitsas](https://github.com/flitsas). Monorepo full-stack con agentes IA integrados al pipeline de desarrollo del equipo FLIT.
 
-## Stack
+**Repositorio GitHub:** `flitsas/abrahamc` · **Rama predeterminada:** `develop`
+
+---
+
+## Stack tecnológico
 
 | Capa | Tecnologías |
 |------|-------------|
-| **Backend** | Node.js 22, TypeScript, Fastify 5, TypeORM, PostgreSQL 16, Zod, Vitest, Pino |
-| **Frontend** | React 19, Vite, TypeScript, TailwindCSS, TanStack Query, Playwright |
-| **Infra** | Docker, Docker Compose |
-| **Calidad** | ESLint, Prettier, Gitleaks |
+| **Backend** | .NET 10, C# 14, ASP.NET Core (Minimal APIs), EF Core, PostgreSQL 16, Serilog, OpenTelemetry |
+| **Frontend** | React 19, Vite 5, TypeScript, TailwindCSS, TanStack Query 5, Zod, Axios, Playwright |
+| **Package manager** | pnpm 10 (workspace monorepo) |
+| **Infra local** | Docker, Docker Compose |
+| **Servicio auxiliar** | Python 3.13 + FastAPI (`services/python-ml`) |
+| **Calidad** | ESLint, Prettier, Vitest, xUnit, Gitleaks |
 | **Gestión** | Azure DevOps (work items) · GitHub (código y PRs) |
+
+---
 
 ## Requisitos previos
 
-- [Node.js](https://nodejs.org/) ≥ 22 (ver `.nvmrc`)
-- [npm](https://www.npmjs.com/) ≥ 10
-- [Docker](https://www.docker.com/) y Docker Compose (para entorno containerizado)
-- [PostgreSQL 16](https://www.postgresql.org/) (opcional si usas solo Docker)
+| Herramienta | Versión mínima | Notas |
+|-------------|----------------|-------|
+| [.NET SDK](https://dotnet.microsoft.com/download) | 10.0.300 | Ver `backend/dotnet/global.json` |
+| [Node.js](https://nodejs.org/) | ≥ 24 | Solo para frontend; ver `.nvmrc` |
+| [pnpm](https://pnpm.io/) | ≥ 10 | `corepack enable` o instalación global |
+| [Docker](https://www.docker.com/) | — | Opcional, recomendado para PostgreSQL |
+| [PostgreSQL](https://www.postgresql.org/) | 16 | Local o vía Docker |
+| [Git](https://git-scm.com/) | — | Para clonar y versionar |
 
-## Inicio rápido
+---
+
+## Contenido del proyecto
+
+### Backend — API .NET (`backend/dotnet/`)
+
+Solución **Flit.slnx** con arquitectura **Clean Architecture** modular:
+
+| Proyecto | Responsabilidad |
+|----------|-----------------|
+| `Flit.Api` | Host HTTP, endpoints Minimal API, middleware, DI |
+| `Flit.Infrastructure` | EF Core, DbContext, repositorios, migraciones |
+| `Flit.Gateway` | API Gateway (YARP) — opcional en DEV |
+| `Flit.SharedKernel` | Tipos y abstracciones compartidas |
+| `Flit.SharedKernel.Pdf` | Utilidades PDF |
+| `Flit.Modules.Auth` | Autenticación, MFA, sesiones |
+| `Flit.Modules.Identity` | Identidad, credenciales, perfiles |
+| `Flit.Modules.Users` | Gestión de usuarios |
+| `Flit.Modules.Rbac` | Roles, permisos, menús |
+| `Flit.Modules.Companies` | Empresas, OT, integración RUNT |
+| `Flit.Modules.Procedures` | Instancias de trámites |
+| `Flit.Modules.ProceduresConfig` | Parametrización de trámites, reglas, documentos |
+| `Flit.Modules.IdentityVerification` | Verificación de identidad (IdSecure) |
+| `Flit.Modules.Integrations` | Consultas externas (Verifik, circuit breaker) |
+| `Flit.Modules.Notifications` | Notificaciones y entregas |
+
+**Grupos de endpoints en `Flit.Api`:** Auth, Users, RBAC, Companies, Procedures, ProceduresConfig, Integrations, IdentityVerification, IdSecure (público, interno, backoffice, operador, analytics, Habeas Data), OT, Trámites (admin, auth, onboarding, profile, support, RBAC), DevSeed.
+
+### Frontend — SPA React (`frontend/`)
+
+Arquitectura **feature-sliced**. Estado actual:
+
+| Ruta / feature | Descripción |
+|----------------|-------------|
+| `features/employees` | Página de empleados |
+| `features/employee-dependents` | Página de dependientes |
+| `features/employee-positions` | Página de cargos |
+| `features/personas` | Página de personas |
+| `shared/components/ui/DashboardLayout` | Layout con navegación lateral |
+| `shared/api/client.ts` | Cliente Axios con interceptors |
+
+### Infraestructura (`infra/`)
+
+- `docker-compose.yml` — PostgreSQL 16, core-api (.NET), frontend (nginx)
+- `postgres-init.sql` — Script de inicialización de la base de datos
+
+### Servicios auxiliares (`services/`)
+
+- `python-ml/` — Microservicio Python 3.13 + FastAPI (OCR / ML, health stub en puerto 4012)
+
+### Agentes IA y plantillas
+
+| Carpeta | Contenido |
+|---------|-----------|
+| `.cursor/agents/` | 11 agentes especializados (backend, frontend, database, QA, security, infra, etc.) |
+| `.cursor/skills/` | Skills reutilizables (dev-tester, playwright-runner, db-schema-validator, etc.) |
+| `.cursor/workflows/` | Flujos guiados (implement-story, review-pr, deploy-env, etc.) |
+| `.cursor/rules/` | Reglas persistentes para Cursor |
+| `agent-templates/` | Plantillas FLIT (DoR, DoD, convenciones, ADR, bugs, test cases) |
+| `CLAUDE.md` | Fuente de verdad para agentes IA |
+
+---
+
+## Estructura del repositorio
+
+```
+.
+├── backend/
+│   ├── dotnet/                    # Solución .NET 10
+│   │   ├── src/
+│   │   │   ├── Flit.Api/          # API principal
+│   │   │   ├── Flit.Infrastructure/
+│   │   │   ├── Flit.Gateway/
+│   │   │   ├── Flit.SharedKernel/
+│   │   │   └── Flit.Modules.*/    # Módulos de dominio
+│   │   ├── Flit.slnx
+│   │   ├── global.json
+│   │   └── Dockerfile
+│   └── CLAUDE.md                  # Convenciones backend
+├── frontend/
+│   ├── src/
+│   │   ├── features/              # Módulos por feature
+│   │   └── shared/                # Componentes y API compartidos
+│   ├── Dockerfile
+│   └── CLAUDE.md                  # Convenciones frontend
+├── infra/
+│   ├── docker-compose.yml         # Stack local (postgres + api + frontend)
+│   └── postgres-init.sql
+├── services/
+│   └── python-ml/                 # Microservicio OCR/ML (Python)
+├── agent-templates/               # Plantillas FLIT
+├── .cursor/                       # Agentes, skills, rules, workflows
+├── docs/
+│   └── decisions/                 # ADRs (ADR-001: Clean Architecture + SOLID)
+├── package.json                   # Scripts del monorepo
+├── pnpm-workspace.yaml            # Workspace pnpm (frontend)
+├── pnpm-lock.yaml
+├── docker-compose.prod.yml        # Compose de producción (VPS)
+└── CLAUDE.md                      # Fuente de verdad para agentes
+```
+
+---
+
+## Cómo ejecutar el proyecto
 
 ### 1. Clonar e instalar dependencias
 
 ```bash
 git clone https://github.com/flitsas/abrahamc.git
 cd abrahamc
-npm install
+pnpm install
+dotnet restore backend/dotnet/Flit.slnx
 ```
 
-### 2. Variables de entorno
+> **Importante:** este proyecto usa **pnpm**, no npm. Si ejecutas `npm install`, el script `preinstall` lo bloqueará.
 
-**Backend** — copiar y ajustar:
+### 2. Levantar la base de datos
+
+**Opción A — Docker (recomendado):**
 
 ```bash
-cp backend/.env.example backend/.env
+docker compose -f infra/docker-compose.yml up postgres -d
 ```
 
-**Frontend** — copiar y ajustar:
+**Opción B — PostgreSQL local:**
+
+Crear base de datos con:
+
+| Parámetro | Valor |
+|-----------|-------|
+| Host | `localhost` |
+| Puerto | `5432` |
+| Base de datos | `flit_dev` |
+| Usuario | `flit` |
+| Contraseña | `flit_local` |
+
+**Aplicar migraciones EF Core:**
 
 ```bash
+pnpm run migrate
+```
+
+### 3. Configurar variables de entorno
+
+**Backend** — editar `backend/dotnet/src/Flit.Api/appsettings.Development.json`:
+
+| Clave | Descripción | Valor DEV |
+|-------|-------------|-----------|
+| `ConnectionStrings:Core` | Cadena PostgreSQL | `Host=localhost;Port=5432;Database=flit_dev;Username=flit;Password=flit_local` |
+| `Cors:AllowedOrigins` | Origen del frontend | `http://localhost:5173` |
+
+También puedes sobreescribir con variables de entorno:
+
+```bash
+# PowerShell
+$env:ConnectionStrings__Core = "Host=localhost;Port=5432;Database=flit_dev;Username=flit;Password=flit_local"
+$env:Cors__AllowedOrigins = "http://localhost:5173"
+```
+
+**Frontend** — copiar el ejemplo y ajustar:
+
+```bash
+# Linux / macOS
 cp frontend/.env.example frontend/.env.local
+
+# Windows (PowerShell)
+Copy-Item frontend\.env.example frontend\.env.local
 ```
 
-**Identidad Azure DevOps** (opcional, para agentes de integración):
+Contenido de `frontend/.env.local`:
+
+```
+VITE_API_BASE_URL=http://localhost:3030/api/v1
+```
+
+### 4. Levantar el backend (.NET)
+
+**Desde la raíz del monorepo:**
 
 ```bash
-cp .env.user-identity.example env.user-identity
-# Editar con tus datos — este archivo NO se commitea
+pnpm run dev:api
 ```
 
-### 3. Desarrollo local (sin Docker)
-
-Levantar PostgreSQL localmente y luego:
+Equivale a:
 
 ```bash
-# Terminal 1 — API (puerto 3030 por defecto)
-npm run dev -w backend
-
-# Terminal 2 — Frontend (puerto 5173)
-npm run dev -w frontend
+dotnet watch run --project backend/dotnet/src/Flit.Api/Flit.Api.csproj
 ```
 
-O ambos en paralelo desde la raíz:
+**Desde `backend/dotnet/`:**
 
 ```bash
-npm run dev
+cd backend/dotnet
+dotnet watch run --project src/Flit.Api/Flit.Api.csproj
 ```
 
-| Servicio | URL |
-|----------|-----|
-| Frontend | http://localhost:5173 |
-| Backend API | http://localhost:3030/api/v1 |
-| Health check | http://localhost:3030/health |
+El backend queda disponible en:
 
-### 4. Desarrollo con Docker
+| Recurso | URL |
+|---------|-----|
+| API base | http://localhost:3030/api/v1 |
+| Health check | http://localhost:3030/api/v1/health |
+| OpenAPI (DEV) | http://localhost:3030/openapi/v1.json |
+
+### 5. Levantar el frontend (React + Vite)
+
+**Desde la raíz:**
+
+```bash
+pnpm run dev:frontend
+```
+
+**Desde `frontend/`:**
+
+```bash
+cd frontend
+pnpm dev
+```
+
+El frontend queda en **http://localhost:5173**. Vite hace proxy de `/api` hacia `http://localhost:3030`.
+
+### 6. Levantar backend + frontend juntos
+
+```bash
+pnpm run dev
+```
+
+Inicia en paralelo:
+- `pnpm run dev:api` → API .NET con hot reload
+- `pnpm run dev:frontend` → Vite dev server
+
+### 7. Stack completo con Docker
+
+Levanta PostgreSQL, API y frontend containerizados:
 
 ```bash
 docker compose -f infra/docker-compose.yml up --build
 ```
 
-Levanta PostgreSQL, backend y frontend con la configuración de `infra/docker-compose.yml`.
+| Servicio | Puerto host | Descripción |
+|----------|-------------|-------------|
+| PostgreSQL | 5432 | Base de datos |
+| core-api | 3030 | API .NET (interno 8081) |
+| frontend | 5173 | SPA servida por nginx (interno 80) |
+
+### 8. Producción (VPS)
+
+Usar `docker-compose.prod.yml` con un archivo `.env` en el servidor:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Variables requeridas en `.env`:
+
+| Variable | Descripción |
+|----------|-------------|
+| `ConnectionStrings__Core` | Cadena PostgreSQL del host |
+| `Cors__AllowedOrigins` | URL pública del frontend |
+
+---
+
+## URLs y puertos (desarrollo local)
+
+| Servicio | URL / Puerto |
+|----------|--------------|
+| Frontend (Vite) | http://localhost:5173 |
+| API (`Flit.Api`) | http://localhost:3030 |
+| Health check | http://localhost:3030/api/v1/health |
+| PostgreSQL | localhost:5432 |
+| Python ML (opcional) | http://localhost:4012/health |
+
+---
 
 ## Scripts disponibles
 
-Desde la raíz del monorepo:
+### Raíz del monorepo (`package.json`)
 
 | Comando | Descripción |
 |---------|-------------|
-| `npm run dev` | Backend + frontend en paralelo |
-| `npm run build` | Build de producción de ambos workspaces |
-| `npm run test` | Tests unitarios (backend + frontend) |
-| `npm run lint` | ESLint en ambos workspaces |
-| `npm run format:check` | Verificar formato Prettier |
+| `pnpm install` | Instalar dependencias del workspace |
+| `pnpm run dev` | Backend + frontend en paralelo |
+| `pnpm run dev:api` | Solo API .NET (`dotnet watch`) |
+| `pnpm run dev:frontend` | Solo frontend (Vite) |
+| `pnpm run build` | Compilar API + frontend |
+| `pnpm run build:api` | Solo `dotnet build` de la solución |
+| `pnpm run test` | Tests API + frontend |
+| `pnpm run test:api` | Solo `dotnet test` |
+| `pnpm run migrate` | Aplicar migraciones EF Core |
+| `pnpm run lint` | ESLint del frontend |
+| `pnpm run format:check` | Prettier check del frontend |
 
-Scripts por workspace (`npm run <script> -w backend|frontend`):
+### Frontend (`frontend/package.json`)
 
-| Workspace | Destacados |
-|-----------|------------|
-| **backend** | `dev`, `build`, `test`, `migration:run`, `migration:revert` |
-| **frontend** | `dev`, `build`, `test`, `test:e2e` |
+| Comando | Descripción |
+|---------|-------------|
+| `pnpm dev` | Servidor de desarrollo Vite |
+| `pnpm build` | `tsc` + build de producción |
+| `pnpm preview` | Previsualizar build de producción |
+| `pnpm test` | Vitest (unitarios) |
+| `pnpm test:watch` | Vitest en modo watch |
+| `pnpm test:coverage` | Cobertura con Vitest |
+| `pnpm test:e2e` | Playwright E2E |
+| `pnpm lint` / `pnpm lint:fix` | ESLint |
+| `pnpm format` / `pnpm format:check` | Prettier |
+| `pnpm typecheck` | Verificación de tipos TypeScript |
 
-## Estructura del proyecto
+### Backend (comandos directos)
 
+```bash
+# Compilar
+dotnet build backend/dotnet/Flit.slnx
+
+# Ejecutar sin watch
+dotnet run --project backend/dotnet/src/Flit.Api/Flit.Api.csproj
+
+# Tests
+dotnet test backend/dotnet/src/Flit.Api/Flit.Api.csproj
+
+# Crear migración
+dotnet ef migrations add <Nombre> \
+  --project backend/dotnet/src/Flit.Infrastructure/Flit.Infrastructure.csproj \
+  --startup-project backend/dotnet/src/Flit.Api/Flit.Api.csproj
+
+# Aplicar migraciones
+pnpm run migrate
 ```
-.
-├── backend/           # API REST — Clean Architecture (Fastify + TypeORM)
-├── frontend/          # SPA React — arquitectura feature-sliced
-├── infra/             # Docker Compose para desarrollo local
-├── agent-templates/   # Plantillas FLIT (US, ADR, DoR, DoD, convenciones)
-├── .cursor/           # Agentes, skills, rules y workflows para Cursor
-├── CLAUDE.md          # Fuente de verdad para agentes IA y convenciones
-└── AGENTS.md          # Punto de entrada alternativo → CLAUDE.md
+
+### Servicio Python ML (opcional)
+
+```bash
+cd services/python-ml
+uv sync --extra dev
+uv run uvicorn app.main:app --reload --port 4012
 ```
+
+Health: http://localhost:4012/health
+
+---
+
+## Compilar y verificar
+
+```bash
+# Compilación completa (backend + frontend)
+pnpm run build
+
+# Solo backend
+pnpm run build:api
+
+# Solo frontend
+pnpm --filter @flit/frontend build
+
+# Lint
+pnpm run lint
+```
+
+---
 
 ## Arquitectura
 
-### Backend (Clean Architecture)
+### Backend (.NET — Clean Architecture + SOLID)
+
+El backend cumple **Clean Architecture estricta** y los **principios SOLID**. ADR **Aceptado**: [`docs/decisions/ADR-001-clean-architecture-solid.md`](docs/decisions/ADR-001-clean-architecture-solid.md).
 
 ```
-backend/src/modules/<modulo>/
-  domain/          → Entidades y contratos (sin frameworks)
-  application/     → Casos de uso
-  infrastructure/  → TypeORM, repositorios
-  interfaces/      → Controllers, rutas y DTOs Zod
+backend/dotnet/src/
+  Flit.Api/                # Endpoints, middleware, configuración
+  Flit.Infrastructure/     # EF Core, migraciones, repositorios
+  Flit.Modules.<Modulo>/
+    Domain/                # Entidades y reglas de negocio (sin EF Core)
+    Application/           # Handlers / casos de uso (SRP)
+    Ports/                 # Interfaces (DIP, ISP)
+    Adapters/              # Implementaciones EF Core o externas
 ```
 
-Detalle en [`backend/CLAUDE.md`](backend/CLAUDE.md).
+| Principio | Aplicación |
+|-----------|------------|
+| **S** | Un handler = un caso de uso |
+| **O** | Extender con nuevos handlers, no modificar Domain con `if` gigantes |
+| **L** | Repositorios InMemory intercambiables en tests |
+| **I** | Puertos pequeños por responsabilidad |
+| **D** | Application depende de `Ports/`, no de `DbContext` |
+
+Detalle en [`backend/CLAUDE.md`](backend/CLAUDE.md) · Ejemplos en [`agent-templates/code-style-guide.md`](agent-templates/code-style-guide.md).
 
 ### Frontend (Feature-sliced)
 
 ```
 frontend/src/features/<feature>/
-  api/             → Schemas Zod + hooks TanStack Query
-  components/      → UI del feature
-  hooks/           → Lógica reutilizable
-  pages/           → Componentes de ruta
+  api/                     # Schemas Zod + hooks TanStack Query
+  components/              # UI del feature
+  pages/                   # Componentes de ruta
+
+frontend/src/shared/
+  api/client.ts            # Cliente Axios
+  components/ui/           # Primitivos UI reutilizables
 ```
 
 Detalle en [`frontend/CLAUDE.md`](frontend/CLAUDE.md).
+
+---
 
 ## Flujo de trabajo Git
 
@@ -150,23 +443,39 @@ Detalle en [`frontend/CLAUDE.md`](frontend/CLAUDE.md).
 
 - Las **PRs** siempre apuntan a `develop`.
 - Convención de commits: `feat(modulo): descripción [#US-ID]`
-- Reglas completas en [`agent-templates/conventions.md`](agent-templates/conventions.md).
+
+---
 
 ## Agentes IA
 
-El proyecto incluye agentes especializados en `.cursor/agents/` para orquestar el ciclo completo: arquitectura, backend, frontend, base de datos, QA, seguridad, infra y code review.
+El proyecto incluye agentes especializados en `.cursor/agents/` para orquestar el ciclo de desarrollo:
 
-Punto de entrada para cualquier herramienta de IA: [`CLAUDE.md`](CLAUDE.md).
+| Agente | Uso |
+|--------|-----|
+| Orchestrator | Flujos completos end-to-end |
+| Tech Lead | Features, descomposición US, DoR/DoD |
+| Architecture | ADRs, diseño técnico |
+| Backend | Implementar historias [BACKEND] |
+| Frontend | Implementar historias [FRONTEND] |
+| Database | Migraciones, schemas, RLS |
+| Code Review | Revisión de PRs |
+| QA | Test cases, Playwright, bugs |
+| Security | SAST, SCA, secretos, Habeas Data |
+| Infra | Docker, CI/CD, deploys |
+| Integration | PRs, Azure DevOps, deploys |
 
-## Producción
+Punto de entrada: [`CLAUDE.md`](CLAUDE.md).
 
-El archivo `docker-compose.prod.yml` define el despliegue en VPS (PostgreSQL en el host, backend y frontend en contenedores). Ver comentarios en el archivo para las variables requeridas.
+---
 
 ## Seguridad
 
-- No commitear archivos `.env`, `env.user-identity` ni credenciales.
-- Gitleaks configurado en `.gitleaks.toml` para detectar secretos en el historial.
-- Variables sensibles solo vía archivos de entorno o secretos del CI/CD.
+- No commitear `.env`, `env.user-identity`, credenciales ni secretos JWT.
+- Gitleaks configurado en `.gitleaks.toml`.
+- Variables sensibles del backend van en `appsettings.*.json` (DEV) o variables de entorno (QA/PDN).
+- El frontend solo expone variables `VITE_*`.
+
+---
 
 ## Licencia
 

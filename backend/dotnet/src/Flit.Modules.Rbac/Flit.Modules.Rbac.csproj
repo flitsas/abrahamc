@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Flit.Modules.Rbac</RootNamespace>
+    <!--
+      CA1711: "Identifier should not have incorrect suffix" — el SDK marca
+      "Permission" como sufijo invalido (espera PermissionAttribute o similar).
+      Pero "Permission" es el sustantivo CORRECTO del dominio RBAC; no aplica.
+    -->
+    <NoWarn>$(NoWarn);CA1711</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Flit.SharedKernel\Flit.SharedKernel.csproj" />
+  </ItemGroup>
+</Project>

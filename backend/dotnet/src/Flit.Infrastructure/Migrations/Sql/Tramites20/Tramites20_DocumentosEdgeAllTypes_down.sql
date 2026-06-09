@@ -1,0 +1,1 @@
+-- No-op: no quitar arista documentos en rollback de backfill.

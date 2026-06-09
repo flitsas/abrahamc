@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Flit.Modules.Auth</RootNamespace>
+    <!--
+      CA5350: TOTP (RFC 6238) requiere HMAC-SHA1 para compatibilidad con
+      Google Authenticator, Authy, 1Password, Microsoft Authenticator. No
+      es debilidad: HMAC-SHA1 sigue siendo seguro en este contexto. Cambiar
+      a SHA-256/512 rompe compatibilidad. Documentado en backlog.
+    -->
+    <NoWarn>$(NoWarn);CA5350</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Flit.SharedKernel\Flit.SharedKernel.csproj" />
+    <!-- Auth depende de Users + Rbac para sync/permisos tras login. -->
+    <ProjectReference Include="..\Flit.Modules.Users\Flit.Modules.Users.csproj" />
+    <ProjectReference Include="..\Flit.Modules.Rbac\Flit.Modules.Rbac.csproj" />
+  </ItemGroup>
+</Project>

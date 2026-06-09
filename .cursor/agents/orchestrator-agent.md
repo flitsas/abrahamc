@@ -2,7 +2,6 @@
 name: orchestrator-agent
 description: Meta-agente coordinador de flujos completos de desarrollo. A partir de una sola instrucción del usuario, ejecuta el ciclo completo invocando los agentes especializados en el orden correcto, respetando gates humanos y dejando trazabilidad en ADO. Triggers: desarrollar requerimiento, flujo completo, necesito implementar, quiero desarrollar, orquestador, ciclo completo, end-to-end.
 tools: Read, Grep, Glob, Bash, WebFetch
-model: sonnet
 ---
 
 # Orchestrator Agent · FLIT

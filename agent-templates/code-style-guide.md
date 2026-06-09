@@ -21,62 +21,76 @@ const name = config!.name        // no ! (non-null assertion)
 console.log('debug')             // no console.log en producción — usa logger
 ```
 
-## Backend (Node.js + Fastify + TypeORM)
+## Backend (.NET 10 + Clean Architecture + SOLID)
 
-```typescript
-// ✅ Clean Architecture — dirección de dependencias
-// domain ← application ← infrastructure → interfaces
+Referencia: `backend/CLAUDE.md` y `docs/decisions/ADR-001-clean-architecture-solid.md`.
 
-// Domain: puro, sin imports externos
-export class Persona {
-  constructor(
-    readonly id: string,
-    readonly nombre: string,
-    readonly documento: string,
-  ) {}
-  
-  static create(nombre: string, documento: string): Persona {
-    if (!nombre.trim()) throw new PersonaInvalidaError('nombre requerido')
-    return new Persona(crypto.randomUUID(), nombre, documento)
-  }
-}
+```csharp
+// ✅ SRP + DIP — Domain puro, sin EF Core ni ASP.NET
+namespace Flit.Modules.Users.Domain;
 
-// Application: use case con inyección de dependencias
-export class CreatePersonaUseCase {
-  constructor(private readonly repo: IPersonaRepository) {}
-  
-  async execute(cmd: CreatePersonaCommand): Promise<PersonaId> {
-    const persona = Persona.create(cmd.nombre, cmd.documento)
-    await this.repo.save(persona)
-    return persona.id
-  }
-}
+public sealed class Employee
+{
+    public Guid Id { get; }
+    public string FullName { get; }
 
-// Interface: controller delgado — sin lógica de negocio
-export const personasRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.post<{ Body: CreatePersonaDto }>('/api/v1/personas', {
-    schema: { body: createPersonaSchema },
-  }, async (request, reply) => {
-    const personaId = await container.cradle.createPersonaUseCase.execute(request.body)
-    return reply.status(201).send({ id: personaId })
-  })
+    private Employee(Guid id, string fullName) => (Id, FullName) = (id, fullName);
+
+    public static Employee Create(string fullName)
+    {
+        if (string.IsNullOrWhiteSpace(fullName))
+            throw new DomainException("El nombre es obligatorio.");
+        return new Employee(Guid.NewGuid(), fullName.Trim());
+    }
 }
 ```
 
-```typescript
-// ❌ Prohibido
-// Lógica de negocio en controller
-fastify.post('/personas', async (req, rep) => {
-  const exists = await db.findOne({ documento: req.body.documento }) // lógica en controller
-  if (exists) throw new Error('duplicado')
-  // ...
-})
+```csharp
+// ✅ DIP — Application depende del puerto, no de EF Core
+namespace Flit.Modules.Users.Application;
 
-// SQL con string concatenation
-db.query("SELECT * FROM personas WHERE id = " + req.params.id)  // SQL injection
+public interface ICreateEmployeeHandler
+{
+    Task<Guid> HandleAsync(CreateEmployeeCommand command, CancellationToken ct);
+}
 
-// Hardcoded credentials
-const DB_PASSWORD = "secreto123"  // nunca
+public sealed class CreateEmployeeHandler(IEmployeeRepository repository) : ICreateEmployeeHandler
+{
+    public async Task<Guid> HandleAsync(CreateEmployeeCommand command, CancellationToken ct)
+    {
+        var employee = Employee.Create(command.FullName);
+        await repository.AddAsync(employee, ct);
+        return employee.Id;
+    }
+}
+```
+
+```csharp
+// ✅ Endpoint delgado — solo mapea HTTP y delega al handler (sin lógica de negocio)
+app.MapPost("/api/v1/employees", async (
+    CreateEmployeeRequest request,
+    ICreateEmployeeHandler handler,
+    CancellationToken ct) =>
+{
+    var id = await handler.HandleAsync(new CreateEmployeeCommand(request.FullName), ct);
+    return Results.Created($"/api/v1/employees/{id}", new { id });
+});
+```
+
+```csharp
+// ❌ Prohibido — lógica de negocio en el endpoint
+app.MapPost("/api/v1/employees", async (CreateEmployeeRequest req, FlitDbContext db) =>
+{
+    if (await db.Employees.AnyAsync(e => e.FullName == req.FullName)) // regla en endpoint
+        return Results.Conflict();
+    // ...
+});
+
+// ❌ Prohibido — Application acoplado a EF Core (viola DIP)
+public class BadHandler(FlitDbContext db) { ... }
+
+// ❌ Prohibido — SQL concatenado (SQL injection)
+db.Database.ExecuteSqlRaw($"SELECT * FROM employees WHERE id = {id}");
 ```
 
 ## Frontend (React + TypeScript)
@@ -128,31 +142,38 @@ const API_URL = process.env.API_URL  // ❌ — usa import.meta.env.VITE_API_URL
 
 ## Tests
 
+### Backend (xUnit + NSubstitute)
+
+```csharp
+// ✅ Patrón AAA — test del handler, no del endpoint
+public class CreateEmployeeHandlerTests
+{
+    [Fact]
+    public async Task HandleAsync_WithValidName_ReturnsEmployeeId()
+    {
+        // Arrange
+        var repository = Substitute.For<IEmployeeRepository>();
+        var handler = new CreateEmployeeHandler(repository);
+        var command = new CreateEmployeeCommand("Juan Pérez");
+
+        // Act
+        var id = await handler.HandleAsync(command, CancellationToken.None);
+
+        // Assert
+        id.Should().NotBeEmpty();
+        await repository.Received(1).AddAsync(Arg.Any<Employee>(), Arg.Any<CancellationToken>());
+    }
+}
+```
+
+### Frontend (Vitest)
+
 ```typescript
 // ✅ Patrón AAA
-describe('CreatePersonaUseCase', () => {
-  it('should create a persona with valid data', async () => {
-    // Arrange
-    const mockRepo = createMockRepo()
-    const useCase = new CreatePersonaUseCase(mockRepo)
-    const cmd = { nombre: 'Juan Pérez', documento: '1234567890' }
-    
-    // Act
-    const id = await useCase.execute(cmd)
-    
-    // Assert
-    expect(id).toBeDefined()
-    expect(mockRepo.save).toHaveBeenCalledOnce()
-  })
-  
-  it('should throw when nombre is empty', async () => {
-    // Arrange
-    const mockRepo = createMockRepo()
-    const useCase = new CreatePersonaUseCase(mockRepo)
-    
-    // Act + Assert
-    await expect(useCase.execute({ nombre: '', documento: '123' }))
-      .rejects.toThrow(PersonaInvalidaError)
+describe('PersonasList', () => {
+  it('renders empty state when no data', () => {
+    render(<PersonasList data={[]} isLoading={false} error={null} />)
+    expect(screen.getByText(/no hay personas/i)).toBeInTheDocument()
   })
 })
 ```
@@ -175,26 +196,41 @@ import { personasSchema } from './personas.dto'
 import { something } from '../../../shared/utils' // deep relative — usa @ alias
 ```
 
-## Env vars
+## Configuración y variables de entorno
 
-```typescript
-// ✅ Siempre validados con Zod al inicio
-const envSchema = z.object({
-  DATABASE_URL: z.string().url(),
-  PORT: z.coerce.number().default(3000),
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-})
+### Backend (.NET)
 
-export const env = envSchema.parse(process.env)  // throws at startup if invalid
+```csharp
+// ✅ Configuración vía IOptions<T> o IConfiguration — nunca hardcodeada
+public class EmployeeService(IOptions<SmtpOptions> smtpOptions) { ... }
+
+// ✅ Variables de entorno con doble guion bajo
+// ConnectionStrings__Core, Cors__AllowedOrigins
 ```
 
-## Logging (Pino)
+Archivo DEV: `backend/dotnet/src/Flit.Api/appsettings.Development.json`
+
+### Frontend (Vite)
 
 ```typescript
-// ✅ Logging estructurado con contexto
-request.log.info({ event: 'persona.created', personaId, durationMs }, 'Persona creada')
+// ✅ Solo variables VITE_* validadas con Zod en bordes
+const apiUrl = import.meta.env.VITE_API_BASE_URL
+```
+
+## Logging
+
+### Backend (Serilog)
+
+```csharp
+// ✅ Logging estructurado
+_logger.LogInformation("Empleado creado {EmployeeId} en {DurationMs}ms", id, elapsed);
 
 // ❌ Nunca logues secretos
-logger.debug({ password: req.body.password })  // ❌
-logger.info({ token: authHeader })              // ❌
+_logger.LogDebug("Token: {Token}", token);  // ❌
+```
+
+### Frontend
+
+```typescript
+// ❌ No uses console.log en producción — usa herramientas de dev o reporting controlado
 ```

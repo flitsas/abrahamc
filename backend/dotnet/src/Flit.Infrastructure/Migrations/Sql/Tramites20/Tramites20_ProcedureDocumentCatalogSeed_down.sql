@@ -1,0 +1,1 @@
+-- No-op: no eliminar catálogo sembrado en rollback de seed.

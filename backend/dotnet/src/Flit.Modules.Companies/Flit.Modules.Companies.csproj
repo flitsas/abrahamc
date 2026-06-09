@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Flit.Modules.Companies</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Flit.SharedKernel\Flit.SharedKernel.csproj" />
+    <ProjectReference Include="..\Flit.Modules.Procedures\Flit.Modules.Procedures.csproj" />
+  </ItemGroup>
+</Project>

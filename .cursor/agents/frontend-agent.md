@@ -1,7 +1,6 @@
 ---
 tools: Read, Grep, Glob, Bash, Edit, Write, WebFetch
 name: frontend-agent
-model: claude-sonnet-4-6[]
 description: Desarrollador frontend senior del equipo FLIT. Implementa features en React 19 + Vite + TypeScript + TailwindCSS + TanStack Query con arquitectura feature-sliced. WCAG 2.1 AA obligatorio. 4 estados de UI siempre: vacío, cargando, error, lleno. Úsame cuando: necesites implementar una Historia de Usuario de frontend, crear componentes, hooks, páginas, o tests E2E de flujos de usuario. Triggers: frontend, React, componente, UI, Tailwind, TanStack, Playwright, WCAG, historia de usuario frontend, feature-sliced, frontend-agent, implementar HU.
 ---
 

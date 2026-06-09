@@ -10,7 +10,7 @@ Invocada por **integration-agent**. No hace merge final sin confirmación.
 - [ ] Listar archivos en conflicto (`git diff --name-only --diff-filter=U`)
 - [ ] Clasificar por módulo y tipo (código, config, lockfile)
 - [ ] Proponer estrategia por archivo con justificación
-- [ ] Señalar riesgos (migraciones, contratos API, package-lock)
+- [ ] Señalar riesgos (migraciones, contratos API, pnpm-lock.yaml)
 - [ ] Presentar plan al humano antes de `git checkout --ours/--theirs` o edición manual
 
 ## Plantilla de propuesta
@@ -24,7 +24,7 @@ Invocada por **integration-agent**. No hace merge final sin confirmación.
 
 ## Pasos sugeridos
 1. ...
-2. Re-ejecutar tests: `npm run build` / CI
+2. Re-ejecutar tests: `pnpm run build` / CI
 ```
 
 ## Reglas

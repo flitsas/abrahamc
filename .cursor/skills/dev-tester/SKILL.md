@@ -20,7 +20,7 @@ backend-agent / frontend-agent (implementa HU)
 
 ## Puerta bloqueante — Definition of Done técnico
 
-**Una HU NO está implementada** hasta cumplir **todos** estos ítems. Correr `npm test` / `dotnet test` en local **no sustituye** este skill.
+**Una HU NO está implementada** hasta cumplir **todos** estos ítems. Correr `pnpm test` / `dotnet test` en local **no sustituye** este skill.
 
 | # | Criterio | Si falla |
 |---|----------|----------|
@@ -289,11 +289,11 @@ public class <Accion><Entidad>UseCaseTests
 
 ```bash
 cd frontend
-npm run test -- --reporter=verbose <ruta/al/archivo.spec.ts> 2>&1 | tee /tmp/dev-tester-frontend-results.txt
+pnpm --filter @flit/frontend run test -- --reporter=verbose <ruta/al/archivo.spec.ts> 2>&1 | tee /tmp/dev-tester-frontend-results.txt
 echo "EXIT_CODE:$?"
 ```
 
-Omitir la ruta para correr toda la suite. Capturar: `passed` / `failed` / `skipped`, mensajes de error y cobertura (`npm run test:coverage` si disponible).
+Omitir la ruta para correr toda la suite. Capturar: `passed` / `failed` / `skipped`, mensajes de error y cobertura (`pnpm --filter @flit/frontend run test:coverage` si disponible).
 
 ### Backend
 

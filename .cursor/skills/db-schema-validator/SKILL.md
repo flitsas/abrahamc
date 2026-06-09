@@ -10,7 +10,7 @@ Solo lectura; no modifica código ni aplica migraciones. Checklist detallado en 
 1. `docs/database-conventions.md` — fuente normativa de schema (checklist §16)
 2. `docs/data-access-conventions.md` — capa de repositorio y acceso a datos (checklist §15)
 3. ADRs vigentes en `docs/decisions/` vinculados a la entidad/migración
-4. Migraciones existentes en `services/core-api/**/Migrations/` y `db/migrations/` (evitar duplicados semánticos)
+4. Migraciones existentes en `backend/dotnet/**/Migrations/` y `db/migrations/` (evitar duplicados semánticos)
 5. Diff del PR o archivos de migración indicados por el invocador
 
 ## Alcance
@@ -68,5 +68,5 @@ rg -n "@pii:" --glob "*.sql"
 
 ```
 Usa db-schema-validator para validar la migración del PR !88
-Usa db-schema-validator sobre los archivos en services/core-api/Modules/Procedures/Migrations/
+Usa db-schema-validator sobre los archivos en backend/dotnet/src/Flit.Infrastructure/Migrations/
 ```

@@ -67,7 +67,7 @@ Crear `.semgrep.yml` en la raíz con reglas custom para patrones específicos de
 ### Layer 2 — SCA (dependencias)
 
 ```bash
-npm audit --omit=dev --json > audit-report.json
+pnpm audit --prod --json > audit-report.json
 ```
 
 Tolerancia FLIT:
@@ -91,7 +91,7 @@ Si un hallazgo es falso positivo, crear `docs/security-exceptions/<hash>.md`:
 # Excepción de Seguridad: <descripción>
 
 **Fecha**: YYYY-MM-DD
-**Herramienta**: semgrep | gitleaks | npm audit
+**Herramienta**: semgrep | gitleaks | pnpm audit
 **Regla/CVE**: <nombre>
 **Archivo:línea**: <path>
 **Razón del falso positivo**: <explicación técnica>

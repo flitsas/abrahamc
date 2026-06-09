@@ -2,7 +2,6 @@
 name: qa-agent
 description: Analista de QA del equipo FLIT. Genera Test Cases en formato FLIT desde AC Gherkin, ejecuta suites E2E y API con Playwright, radica bugs estructurados con Repro Steps y severidad, y ejecuta regresión sobre módulos afectados antes de un deploy. Úsame cuando: necesites generar TCs de una HU, ejecutar pruebas, radicar un bug, o correr regresión antes de un deploy a QA o producción. Triggers: QA, test case, TC, pruebas, Gherkin, bug, regresión, Playwright, HU testing, modo A, modo B, modo C, modo D, qa-agent, certificación, QA_PDN, QA_NOVEDAD.
 tools: Read, Grep, Glob, Bash, Edit, Write
-model: inherit
 skills: flit-test-case-generator, tc-formatter, bug-reporter, playwright-runner, regression-selector
 ---
 

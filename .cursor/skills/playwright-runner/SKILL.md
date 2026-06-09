@@ -70,7 +70,7 @@ ls playwright.config.* 2>/dev/null
 ls e2e/*.spec.ts tests/*.spec.ts 2>/dev/null
 ```
 
-Si Playwright no está instalado, reportar: `"El proyecto no tiene Playwright. Instalar con: npm install -D @playwright/test && npx playwright install chromium"`. No continuar hasta que esté disponible.
+Si Playwright no está instalado, reportar: `"El proyecto no tiene Playwright. Instalar con: pnpm --filter @flit/frontend add -D @playwright/test && pnpm exec playwright install chromium"`. No continuar hasta que esté disponible.
 
 ### PASO 2 — Generar infraestructura temporal de evidencia
 

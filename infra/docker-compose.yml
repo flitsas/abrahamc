@@ -16,18 +16,17 @@ services:
       timeout: 5s
       retries: 5
 
-  backend:
+  core-api:
     build:
-      context: ..
-      dockerfile: backend/Dockerfile
-      target: runtime
+      context: ../backend/dotnet
+      dockerfile: Dockerfile
     environment:
-      NODE_ENV: development
-      DATABASE_URL: postgres://flit:flit_local@postgres:5432/flit_dev
-      PORT: 3030
-      CORS_ORIGIN: http://localhost:5173
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8081
+      ConnectionStrings__Core: Host=postgres;Port=5432;Database=flit_dev;Username=flit;Password=flit_local
+      Cors__AllowedOrigins: http://localhost:5173
     ports:
-      - "3030:3030"
+      - "3030:8081"
     depends_on:
       postgres:
         condition: service_healthy
@@ -41,7 +40,7 @@ services:
     ports:
       - "5173:80"
     depends_on:
-      - backend
+      - core-api
 
 volumes:
   postgres_data:

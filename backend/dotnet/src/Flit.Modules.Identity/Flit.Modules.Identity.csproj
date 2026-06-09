@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Flit.Modules.Identity</RootNamespace>
+    <PublishAot>false</PublishAot>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Flit.SharedKernel\Flit.SharedKernel.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- JWT manual (sin OpenIddict en MVP por R1 AOT spike pendiente). -->
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" />
+    <!-- Argon2id AOT-friendly (Konscious.Security.Cryptography). -->
+    <PackageReference Include="Konscious.Security.Cryptography.Argon2" />
+    <!-- AWS Cognito provider (ADR-0006 Provider Pattern + ADR-0008). -->
+    <PackageReference Include="AWSSDK.CognitoIdentityProvider" />
+  </ItemGroup>
+
+</Project>

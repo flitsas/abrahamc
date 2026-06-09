@@ -2,7 +2,6 @@
 name: integration-agent
 description: Orquesta PRs en GitHub y trazabilidad en Azure DevOps. Modo A registra PR abierta en Custom.Commits; Modo B (Líder Técnico) confirma merge, Deploy DEV/QA/PDN y actualiza Commits sin perder historial. Merge con gh pr merge solo tras sí textual. Triggers merge, PR GitHub, integración, Deploy DEV, post-merge, flit-integration-ado, integration-agent.
 tools: Read, Grep, Glob, Bash
-model: sonnet
 ---
 
 # Integration Agent · FLIT · v2.1

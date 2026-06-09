@@ -10,8 +10,9 @@
 Boilerplate del equipo FLIT para desarrollo full-stack con agentes IA integrados al pipeline de desarrollo.
 
 **Stack**:
-- Backend: Node.js 22 + TypeScript strict + Fastify 5 + TypeORM + PostgreSQL 16 + Zod + Vitest + Pino
+- Backend: .NET 10 + C# + ASP.NET Core + EF Core + PostgreSQL 16 + xUnit + Serilog
 - Frontend: React 19 + Vite + TypeScript + TailwindCSS + TanStack Query + Playwright
+- Package manager: pnpm 10 (workspace; `pnpm-workspace.yaml`)
 - CI/CD: GitHub Actions
 - Work items: Azure DevOps Boards (ADO)
 - Código: GitHub
@@ -28,16 +29,19 @@ Boilerplate del equipo FLIT para desarrollo full-stack con agentes IA integrados
 │   ├── skills/             # Skills reutilizables por agentes
 │   └── workflows/          # Flujos guiados (implement, review, deploy…)
 ├── agent-templates/        # Plantillas FLIT (conventions, DoR, DoD, etc.)
-├── backend/                # API Node.js (Clean Architecture)
+├── backend/
+│   ├── dotnet/             # API .NET 10 (Flit.Api, módulos, EF Core)
+│   └── CLAUDE.md           # Convenciones backend .NET
 ├── frontend/               # App React (Feature-sliced)
 ├── infra/                  # Docker Compose local + init PostgreSQL
+├── services/               # Servicios auxiliares (python-ml, etc.)
+├── docs/                   # ADRs, diseños, runbooks
 ├── CLAUDE.md               # ← Este archivo (fuente de verdad)
 ├── AGENTS.md               # Redirige a CLAUDE.md
 ├── docker-compose.prod.yml # Compose de producción (VPS)
-└── package.json            # Monorepo npm workspaces (backend + frontend)
+├── pnpm-workspace.yaml     # Workspace pnpm (frontend)
+└── package.json            # Monorepo (scripts dotnet + pnpm)
 ```
-
-> Carpetas previstas a medida que el proyecto crezca: `docs/` (ADRs, diseños, runbooks) y `scripts/` (utilidades).
 
 ## Agentes disponibles
 
@@ -101,27 +105,27 @@ Todos los agentes aceptan historias/features de múltiples fuentes. Si no especi
 4. **Texto directo** — pega el contenido en el chat
 5. **Sin historia** — el agente explica sus capacidades
 
-## Arquitectura del backend (Clean Architecture)
+## Arquitectura del backend (.NET Clean Architecture + SOLID)
+
+El backend **debe cumplir Clean Architecture estricta y los principios SOLID**. Esto es obligatorio en código nuevo y en refactors tocados por una HU.
+
+- **ADR (Aceptado):** `docs/decisions/ADR-001-clean-architecture-solid.md`
+- **Implementación detallada:** `backend/CLAUDE.md`
+- **Ejemplos de código:** `agent-templates/code-style-guide.md`
 
 ```
-src/modules/<modulo>/
-  domain/
-    <Entidad>.entity.ts           # Clase pura, sin decoradores ORM
-    <entidad>.repository.interface.ts  # Interface del puerto
-  application/
-    <accion>-<entidad>.use-case.ts     # Un caso de uso por archivo
-  infrastructure/
-    <entidad>.typeorm-entity.ts        # Decoradores TypeORM
-    <entidad>.typeorm-repository.ts    # Implementación del repositorio
-  interfaces/
-    <entidades>.controller.ts          # Fastify route handler
-    <entidades>.routes.ts              # Registro de rutas
-    <entidades>.dto.ts                 # Schemas Zod (request + response)
+backend/dotnet/src/
+  Flit.Api/                    # Endpoints Minimal API, middleware, DI
+  Flit.Infrastructure/         # EF Core DbContext, migraciones, repositorios
+  Flit.SharedKernel/           # Abstracciones y tipos compartidos
+  Flit.Modules.<Modulo>/
+    Domain/                    # Entidades y reglas de negocio puras
+    Application/               # Casos de uso, handlers (SRP)
+    Ports/                     # Interfaces — DIP
+    Adapters/                  # Implementaciones EF Core / externas
 ```
 
-**Regla de dependencias**: domain ← application ← infrastructure → interfaces. Las capas internas nunca importan las externas.
-
-Convenciones detalladas: `backend/CLAUDE.md`.
+**Regla de dependencias**: Domain ← Application ← Infrastructure. `Flit.Api` solo orquesta — nunca lógica de negocio.
 
 ## Arquitectura del frontend (Feature-sliced)
 
@@ -147,13 +151,12 @@ Convenciones detalladas: `frontend/CLAUDE.md`.
 
 | Tipo | Convención | Ejemplo |
 |------|-----------|---------|
-| Archivos | `kebab-case.ts` | `create-persona.use-case.ts` |
-| Clases | `PascalCase` | `PersonaRepository` |
+| Archivos C# | `PascalCase.cs` | `CreatePersonaHandler.cs` |
+| Clases / records | `PascalCase` | `PersonaRepository` |
 | Interfaces | `IPascalCase` | `IPersonaRepository` |
-| Variables/funciones | `camelCase` | `findById` |
-| Constantes | `UPPER_SNAKE_CASE` | `MAX_RETRIES` |
-| Tests | `<nombre>.spec.ts` | `create-persona.use-case.spec.ts` |
-| Componentes React | `PascalCase.tsx` | `PersonaList.tsx` |
+| Archivos TS/React | `kebab-case.ts` / `PascalCase.tsx` | `persona.api.ts`, `PersonaList.tsx` |
+| Tests backend | `*Tests.cs` | `CreatePersonaHandlerTests.cs` |
+| Tests frontend | `<nombre>.spec.ts` | `persona-list.spec.ts` |
 
 ## Branches y commits
 
@@ -163,10 +166,21 @@ Convenciones detalladas: `frontend/CLAUDE.md`.
 
 ## Variables de entorno
 
-- Backend: `backend/.env` (ver `backend/.env.example`)
+- Backend: `backend/dotnet/src/Flit.Api/appsettings.Development.json` + env vars (`ConnectionStrings__Core`, `Cors__AllowedOrigins`)
 - Frontend: `frontend/.env.local` (ver `frontend/.env.example`) — solo variables `VITE_*`
 - Identidad ADO (local, no commitear): copiar `.env.user-identity.example` → `env.user-identity`
 - NUNCA hardcodear en código, Dockerfile ni docker-compose
+
+## Comandos de desarrollo
+
+```bash
+pnpm install         # Instalar dependencias (solo frontend)
+pnpm run dev         # API .NET + frontend en paralelo
+pnpm run dev:api     # Solo Flit.Api (dotnet watch)
+pnpm run build:api   # dotnet build
+pnpm run test:api    # dotnet test
+pnpm run migrate     # EF Core database update
+```
 
 ## Para contribuir
 

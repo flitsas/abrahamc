@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Flit.Api/Flit.Api.csproj" />
+    <Project Path="src/Flit.Gateway/Flit.Gateway.csproj" />
+    <Project Path="src/Flit.Modules.Identity/Flit.Modules.Identity.csproj" />
+    <Project Path="src/Flit.Modules.Users/Flit.Modules.Users.csproj" />
+    <Project Path="src/Flit.Modules.Auth/Flit.Modules.Auth.csproj" />
+    <Project Path="src/Flit.Modules.Rbac/Flit.Modules.Rbac.csproj" />
+    <Project Path="src/Flit.Modules.Notifications/Flit.Modules.Notifications.csproj" />
+    <Project Path="src/Flit.Modules.IdentityVerification/Flit.Modules.IdentityVerification.csproj" />
+    <Project Path="src/Flit.Modules.ProceduresConfig/Flit.Modules.ProceduresConfig.csproj" />
+    <Project Path="src/Flit.Modules.Procedures/Flit.Modules.Procedures.csproj" />
+    <Project Path="src/Flit.SharedKernel/Flit.SharedKernel.csproj" />
+    <Project Path="src/Flit.SharedKernel.Pdf/Flit.SharedKernel.Pdf.csproj" />
+    <Project Path="src/Flit.Infrastructure/Flit.Infrastructure.csproj" />
+    <Project Path="src/Flit.Modules.Integrations/Flit.Modules.Integrations.csproj" />
+    <Project Path="src/Flit.Modules.Companies/Flit.Modules.Companies.csproj" />
+  </Folder>
+</Solution>

@@ -2,19 +2,30 @@
   "name": "flit-boilerplate",
   "version": "1.0.0",
   "description": "FLIT Boilerplate — Full-stack monorepo con agentes IA integrados",
-  "workspaces": ["backend", "frontend"],
+  "private": true,
+  "packageManager": "pnpm@10.20.0",
   "scripts": {
-    "dev": "concurrently \"npm run dev -w backend\" \"npm run dev -w frontend\"",
-    "build": "npm run build -w backend && npm run build -w frontend",
-    "test": "npm run test -w backend && npm run test -w frontend",
-    "lint": "npm run lint -w backend && npm run lint -w frontend",
-    "format:check": "npm run format:check -w backend && npm run format:check -w frontend",
+    "preinstall": "npx only-allow pnpm",
+    "dev": "concurrently \"pnpm run dev:api\" \"pnpm --filter @flit/frontend dev\"",
+    "dev:api": "dotnet watch run --project backend/dotnet/src/Flit.Api/Flit.Api.csproj",
+    "dev:frontend": "pnpm --filter @flit/frontend dev",
+    "build": "dotnet build backend/dotnet/Flit.slnx && pnpm --filter @flit/frontend build",
+    "build:api": "dotnet build backend/dotnet/Flit.slnx",
+    "test": "dotnet test backend/dotnet/src/Flit.Api/Flit.Api.csproj && pnpm --filter @flit/frontend test",
+    "test:api": "dotnet test backend/dotnet/src/Flit.Api/Flit.Api.csproj",
+    "migrate": "dotnet ef database update --project backend/dotnet/src/Flit.Infrastructure/Flit.Infrastructure.csproj --startup-project backend/dotnet/src/Flit.Api/Flit.Api.csproj",
+    "lint": "pnpm --filter @flit/frontend lint",
+    "format:check": "pnpm --filter @flit/frontend format:check",
     "sync:agents": "./scripts/sync-agents.sh"
   },
   "devDependencies": {
     "concurrently": "^9.0.1"
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=24.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
   }
 }

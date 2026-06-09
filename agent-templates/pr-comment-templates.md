@@ -131,7 +131,7 @@ Co-authored-by: {Reviewer Humano} <{email}>
 | Layer | Hallazgos | Critical | High | Medium | Low |
 |-------|-----------|----------|------|--------|-----|
 | SAST (Semgrep) | {N} | {N} | {N} | {N} | {N} |
-| SCA (npm audit) | {N} | {N} | {N} | {N} | {N} |
+| SCA (pnpm audit) | {N} | {N} | {N} | {N} | {N} |
 | Secrets (gitleaks) | {N} | — | — | — | — |
 | Habeas Data | {N} | — | {N} | {N} | — |
 

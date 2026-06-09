@@ -1,75 +1,79 @@
----
-description: "FLIT AI Agents — Reglas y convenciones para el equipo de desarrollo FLIT"
-globs: ["**/*.ts", "**/*.tsx", "**/*.md", "**/*.sql"]
-alwaysApply: true
----
-
-# FLIT AI Agents — Cursor Rules
-
-Cuando trabajes en este repositorio, sigue las convenciones del equipo FLIT definidas en los agentes de `.ai/agents/`.
-
-## Stack tecnológico
-
-- **Backend**: Node.js 22 + TypeScript (strict) + Fastify + TypeORM + PostgreSQL 16 + Zod + Vitest + Pino
-- **Frontend**: React 19 + Vite + TypeScript + TailwindCSS + TanStack Query + Vitest + Playwright
-
-## Estructura de directorios
-
-**Backend (Clean Architecture)**:
-```
-backend/src/modules/<modulo>/
-  domain/          # Entities, value objects, interfaces — SIN imports de infra
-  application/     # Use cases — SIN imports de frameworks HTTP
-  infrastructure/  # TypeORM entities, repositories, adapters externos
-  interfaces/      # Controllers Fastify, DTOs Zod, routes
-```
-
-**Frontend (Feature-sliced)**:
-```
-frontend/src/features/<feature>/
-  api/             # Clientes HTTP + hooks TanStack Query + schemas Zod
-  components/      # UI del feature
-  hooks/           # Lógica reusable
-  pages/           # Route-level components
-```
-
-## Convenciones de código
-
-- TypeScript strict mode: no `any`, no `as`, no `!`
-- Zod para validación en bordes (HTTP input/output, env vars)
-- Pino para logging — sin `console.log` en producción
-- Tests AAA (Arrange/Act/Assert) con Vitest
-- Los 4 estados de UI siempre: vacío, cargando, error, lleno
-- WCAG 2.1 AA obligatorio en frontend
-
-## Convenciones de trabajo (ADO)
-
-- Story Points: Fibonacci (1, 2, 3, 5, 8)
-- Sprint: SIEMPRE el siguiente al activo, nunca el activo
-- Area: FLIT
-- Tags: `DOR`, `adopcion-ia`, `fase-1-diseño`
-- Bugs PDN: SIEMPRE al Líder Técnico, NUNCA directo al dev
-- PRs: target = `develop`, ≤ 800 líneas, ≥1 reviewer humano
-
-## Agentes disponibles
-
-Los agentes están en `.ai/agents/`. Para usarlos en Cursor, pega el contenido del agente relevante en el chat como instrucción de sistema:
-
-- **tech-lead-agent.md**: redactar Features, descomponer en US, validar DoR/DoD
-- **architecture-agent.md**: diseño técnico con tradeoffs
-- **backend-agent.md**: implementación backend Node.js
-- **frontend-agent.md**: implementación frontend React
-- **code-review-agent.md**: review de PRs
-- **integration-agent.md**: merge de PRs
-- **qa-agent.md**: test cases y tests automatizados
-- **security-agent.md**: análisis de seguridad
-- **infra-agent.md**: infraestructura y deploy
-- **orchestrator.md** (`.ai/orchestrator.md`): flujos completos
-
-## Comandos rápidos
-
-Los comandos en `.ai/commands/` son plantillas de flujo completo. Pega el contenido en el chat para ejecutarlos.
-
-## ADRs vigentes
-
-Lee `docs/decisions/README.md` para ver las decisiones arquitectónicas vigentes. No contradigas ADRs `Aceptado` sin justificación documentada.
+---
+description: "FLIT AI Agents — Reglas y convenciones para el equipo de desarrollo FLIT"
+globs: ["**/*.cs", "**/*.ts", "**/*.tsx", "**/*.md", "**/*.sql"]
+alwaysApply: true
+---
+
+# FLIT AI Agents — Cursor Rules
+
+Cuando trabajes en este repositorio, sigue las convenciones del equipo FLIT definidas en `.cursor/agents/` y `CLAUDE.md`.
+
+## Stack tecnológico
+
+- **Backend**: .NET 10 + C# + ASP.NET Core + EF Core + PostgreSQL 16 + xUnit + Serilog
+- **Frontend**: React 19 + Vite + TypeScript + TailwindCSS + TanStack Query + Vitest + Playwright
+- **Package manager**: pnpm 10
+
+## Arquitectura backend (Clean Architecture + SOLID — obligatorio)
+
+ADR: `docs/decisions/ADR-001-clean-architecture-solid.md` · Detalle: `backend/CLAUDE.md`
+
+```
+backend/dotnet/src/
+  Flit.Api/              # Endpoints Minimal API — solo orquestación HTTP
+  Flit.Infrastructure/   # EF Core, DbContext, migraciones, repositorios
+  Flit.Modules.<Modulo>/
+    Domain/              # Entidades y reglas — SIN EF Core ni ASP.NET
+    Application/         # Handlers / casos de uso — SRP, DIP
+    Ports/               # Interfaces — ISP
+    Adapters/            # Implementaciones EF Core / externas
+```
+
+**Dependencias**: Domain ← Application ← Infrastructure. Nunca al revés.
+
+## Arquitectura frontend (Feature-sliced)
+
+```
+frontend/src/features/<feature>/
+  api/             # Clientes HTTP + hooks TanStack Query + schemas Zod
+  components/      # UI del feature
+  hooks/           # Lógica reusable
+  pages/           # Route-level components
+```
+
+## Convenciones de código
+
+- Backend: Clean Architecture + SOLID; Serilog para logging — sin `Console.WriteLine` en producción
+- Frontend: TypeScript strict — no `any`, no `as`, no `!`
+- Zod para validación en bordes del frontend
+- Tests AAA (Arrange/Act/Assert)
+- Los 4 estados de UI siempre: vacío, cargando, error, lleno
+- WCAG 2.1 AA obligatorio en frontend
+
+## Convenciones de trabajo (ADO)
+
+- Story Points: Fibonacci (1, 2, 3, 5, 8)
+- Sprint: SIEMPRE el siguiente al activo, nunca el activo
+- Bugs PDN: SIEMPRE al Líder Técnico, NUNCA directo al dev
+- PRs: target = `develop`, ≤ 800 líneas, ≥1 reviewer humano
+
+## Agentes disponibles
+
+Los agentes están en `.cursor/agents/`:
+
+- **orchestrator-agent.md**: flujos completos end-to-end
+- **tech-lead-agent.md**: Features, descomposición US, DoR/DoD
+- **architecture-agent.md**: diseño técnico, ADRs, tradeoffs
+- **backend-agent.md**: implementación backend .NET (Clean Architecture + SOLID)
+- **frontend-agent.md**: implementación frontend React
+- **database-agent.md**: migraciones, schemas, repositorios
+- **code-review-agent.md**: review de PRs (bloquea violaciones de capas)
+- **integration-agent.md**: merge de PRs, trazabilidad ADO
+- **qa-agent.md**: test cases y tests automatizados
+- **security-agent.md**: análisis de seguridad
+- **infra-agent.md**: infraestructura y deploy
+
+## ADRs vigentes
+
+Lee `docs/decisions/README.md`. No contradigas ADRs `Aceptado` sin nuevo ADR con `Supersedes`.
+
