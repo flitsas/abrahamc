@@ -1,0 +1,17 @@
+title = "FLIT Boilerplate — Gitleaks Config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Example/template files contain placeholder credentials, not real secrets"
+paths = [
+  '''\.example$''',
+]
+
+[[allowlists]]
+description = "Local-dev and CI test credentials — not real secrets, not exposed in production"
+stopwords = [
+  "flit_local",
+  "flit_test",
+]

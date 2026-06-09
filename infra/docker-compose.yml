@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: flit
+      POSTGRES_PASSWORD: flit_local
+      POSTGRES_DB: flit_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flit -d flit_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+      target: runtime
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgres://flit:flit_local@postgres:5432/flit_dev
+      PORT: 3030
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - "3030:3030"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    environment:
+      VITE_API_BASE_URL: http://localhost:3030/api/v1
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

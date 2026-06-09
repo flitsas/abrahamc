@@ -1,0 +1,20 @@
+{
+  "name": "flit-boilerplate",
+  "version": "1.0.0",
+  "description": "FLIT Boilerplate — Full-stack monorepo con agentes IA integrados",
+  "workspaces": ["backend", "frontend"],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "test": "npm run test -w backend && npm run test -w frontend",
+    "lint": "npm run lint -w backend && npm run lint -w frontend",
+    "format:check": "npm run format:check -w backend && npm run format:check -w frontend",
+    "sync:agents": "./scripts/sync-agents.sh"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

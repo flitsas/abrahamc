@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+logs/
+pino-logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Runtime data
+*.pid
+*.seed
+
+# Test artifacts
+playwright-report/
+test-results/
+.vitest-cache/
+
+# Docker
+postgres_data/
+
+# Misc
+*.bak
+.env.user-identity
+env.user-identity
+.env.verifik

@@ -1,0 +1,5 @@
+# False positives — example code in skill documentation files.
+# These are intentional examples of what a hardcoded secret looks like,
+# used in the inline-security-detector skill to illustrate bad patterns.
+.ai/skills/flit-inline-security-detector/SKILL.md:generic-api-key:65
+.claude/skills/flit-inline-security-detector/SKILL.md:generic-api-key:65

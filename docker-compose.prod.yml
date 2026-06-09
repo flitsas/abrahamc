@@ -1,0 +1,37 @@
+# Production docker-compose — used on the VPS.
+# PostgreSQL runs on the host machine (not in Docker).
+# Copy this file to the deploy directory on the VPS.
+# Create a .env file alongside it with the variables listed below.
+#
+# Required .env variables:
+#   DATABASE_URL   — full connection string to the host PostgreSQL
+#                    e.g. postgres://flit:password@host.docker.internal:5432/flit_prod
+#   CORS_ORIGIN    — public URL of the frontend (e.g. https://app.tudominio.com)
+#
+# Optional .env variables:
+#   PUBLIC_PORT    — host port to expose (default: 80)
+#   LOG_LEVEL      — pino log level (default: info)
+
+services:
+  backend:
+    image: ghcr.io/flitsas/flit-boilerplate/backend:latest
+    # host.docker.internal resolves to the host machine on Linux via extra_hosts below
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:3030:3030"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      PORT: 3030
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/flitsas/flit-boilerplate/frontend:latest
+    ports:
+      - "127.0.0.1:${PUBLIC_PORT:-8090}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
