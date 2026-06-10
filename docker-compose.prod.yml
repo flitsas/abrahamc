@@ -49,7 +49,7 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       ASPNETCORE_ENVIRONMENT: Develop
-      ASPNETCORE_URLS: http://+:80
+      ASPNETCORE_URLS: http://+:8081
       ConnectionStrings__Core: ${CONNECTION_STRING_CORE}
       Cors__AllowedOrigins: ${CORS_ORIGIN:-https://dev.abrahamc.flitsas.online}
       # Login deshabilitado temporalmente: DevGenerate evita exigir llaves JWT
@@ -69,7 +69,7 @@ services:
     ports:
       - "127.0.0.1:${CORE_API_PORT:-40305}:80"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80/api/v1/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081/api/v1/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -85,7 +85,7 @@ services:
     working_dir: /app/gateway
     environment:
       ASPNETCORE_ENVIRONMENT: Develop
-      ASPNETCORE_URLS: http://+:80
+      ASPNETCORE_URLS: http://+:8080
       Cors__AllowedOrigins__0: ${CORS_ORIGIN:-https://dev.abrahamc.flitsas.online}
       # Login deshabilitado temporalmente: sin llave JWT el gateway no valida firma
       # ni exige autenticación (ver Flit.Gateway/Program.cs).
@@ -95,7 +95,7 @@ services:
       core-api:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
       interval: 30s
       timeout: 5s
       retries: 3
