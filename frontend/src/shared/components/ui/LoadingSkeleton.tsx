@@ -8,7 +8,7 @@ export function LoadingSkeleton({ rows = 4 }: LoadingSkeletonProps) {
       {Array.from({ length: rows }).map((_, index) => (
         <div
           key={index}
-          className="h-10 animate-pulse rounded-lg bg-slate-200"
+          className="h-10 animate-pulse rounded-lg bg-flit-border/60"
         />
       ))}
     </div>

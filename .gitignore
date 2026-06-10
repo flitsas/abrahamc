@@ -44,6 +44,9 @@ test-results/
 # Docker
 postgres_data/
 
+# Local dev tools (downloaded binaries)
+infra/cloudflared/cloudflared.exe
+
 # Misc
 *.bak
 .env.user-identity

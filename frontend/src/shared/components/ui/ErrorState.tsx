@@ -13,16 +13,16 @@ export function ErrorState({
 
   return (
     <div
-      className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-900"
+      className="rounded-flit-card border border-flit-danger/25 bg-flit-danger/10 p-6 text-flit-danger"
       role="alert"
     >
-      <h2 className="text-lg font-semibold">{title}</h2>
+      <h2 className="text-lg font-semibold text-flit-blueDark">{title}</h2>
       <p className="mt-2 text-sm">{message}</p>
       {onRetry && (
         <button
           type="button"
           onClick={onRetry}
-          className="mt-4 rounded-lg bg-red-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-800"
+          className="mt-4 rounded-flit-pill bg-flit-danger px-5 py-2 text-sm font-semibold text-white transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-flit-blue"
         >
           Reintentar
         </button>

@@ -1,19 +1,37 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { AppLayout } from "../../../app/AppLayout.js";
 import { AuthShell } from "../../../shared/components/flit/AuthShell.js";
 import { GradientButton } from "../../../shared/components/flit/GradientButton.js";
+import { SplitCurtain } from "../../../shared/components/flit/SplitCurtain.js";
 import { TextField } from "../../../shared/components/flit/TextField.js";
 import { useAuthMe, useLogin } from "../api/auth.api.js";
+import { LoginWelcome } from "../components/LoginWelcome.js";
 
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { data: session, isLoading: sessionLoading } = useAuthMe();
   const login = useLogin();
+  const [showWelcome, setShowWelcome] = useState(true);
+  const [isExiting, setIsExiting] = useState(false);
+  const [exitCurtainOpen, setExitCurtainOpen] = useState(false);
   const [email, setEmail] = useState("superadmin@flit.com.co");
   const [password, setPassword] = useState("FlitDev2026!");
 
   const redirectTo = (location.state as { from?: string } | null)?.from ?? "/";
+
+  useEffect(() => {
+    if (!isExiting) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      setExitCurtainOpen(true);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [isExiting]);
 
   if (sessionLoading) {
     return (
@@ -23,7 +41,7 @@ export function LoginPage() {
     );
   }
 
-  if (session) {
+  if (session && !isExiting) {
     return <Navigate to={redirectTo} replace />;
   }
 
@@ -31,13 +49,13 @@ export function LoginPage() {
     event.preventDefault();
     try {
       await login.mutateAsync({ email, password });
-      navigate(redirectTo, { replace: true });
+      setIsExiting(true);
     } catch {
       // Error shown via login.error
     }
   }
 
-  return (
+  const loginShell = (
     <AuthShell
       title="Iniciar sesión"
       subtitle="Ingresa con tu correo corporativo para acceder al panel administrativo."
@@ -76,7 +94,7 @@ export function LoginPage() {
           </div>
         )}
 
-        <GradientButton type="submit" disabled={login.isPending}>
+        <GradientButton type="submit" disabled={login.isPending || isExiting}>
           {login.isPending ? "Ingresando…" : "Ingresar"}
         </GradientButton>
       </form>
@@ -88,6 +106,28 @@ export function LoginPage() {
         </span>
       </p>
     </AuthShell>
+  );
+
+  if (isExiting) {
+    return (
+      <>
+        <AppLayout previewPath={redirectTo} />
+        <SplitCurtain
+          open={exitCurtainOpen}
+          variant="content"
+          onComplete={() => navigate(redirectTo, { replace: true })}
+        >
+          {loginShell}
+        </SplitCurtain>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {loginShell}
+      {showWelcome && <LoginWelcome onComplete={() => setShowWelcome(false)} />}
+    </>
   );
 }
 
