@@ -14,4 +14,8 @@ public sealed class SmtpOptions
     public string? Password { get; set; }
     public string From { get; set; } = string.Empty;
     public string? FromName { get; set; }
+
+    public bool IsConfigured =>
+        !string.IsNullOrWhiteSpace(Host) &&
+        !string.IsNullOrWhiteSpace(From);
 }

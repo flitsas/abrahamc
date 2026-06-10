@@ -11,6 +11,8 @@
 | `AddTramites20RuntimeLayer` | #9467, #9408, #9469, #9369 | 70, 75, 76, 80, 90 |
 | `AddTramites20DevFunctionalSeed` | Todos (escenario DEV) | seed mock |
 | `AddOtTrafficAgenciesCatalogSeed` | #9378 #9454 (OT-01) | catálogo ~359 OT en `ot.traffic_agencies` |
+| `AddFeatures9549_9557FoundationGaps` (`20260610144632`) | #9549 #9550 #9553 #9557 | ABAC, excepciones vehiculares, matriz OT tenant, SMTP templates, etiquetas OT |
+| `AddFeatures9549_9557DevSeed` (`20260610144706`) | #9549 #9550 #9553 #9557 | mocks DEV complementarios |
 
 ## Aplicar en local (recomendado BD limpia)
 

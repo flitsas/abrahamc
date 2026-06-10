@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Flit.Modules.ProceduresConfig\Flit.Modules.ProceduresConfig.csproj" />
     <ProjectReference Include="..\..\src\Flit.Modules.Identity\Flit.Modules.Identity.csproj" />
+    <ProjectReference Include="..\..\src\Flit.Modules.Notifications\Flit.Modules.Notifications.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,37 +1,24 @@
-using System.Net;
-using Flit.Infrastructure.Email;
 using Flit.Modules.Identity.Application;
+using Flit.Modules.Notifications.Domain;
+using Flit.Modules.Notifications.Ports;
 
 namespace Flit.Infrastructure.Adapters;
 
-/// <summary>Envía invitación de onboarding por SMTP (HU #9418).</summary>
-public sealed class SmtpOnboardingEmailNotifier(SmtpEmailSender sender) : IOnboardingEmailNotifier
+/// <summary>Envía invitación de onboarding vía servicio SMTP global (#9549 HU #9682).</summary>
+public sealed class SmtpOnboardingEmailNotifier(IGlobalEmailService globalEmail) : IOnboardingEmailNotifier
 {
-    public async Task SendInvitationAsync(
+    public Task SendInvitationAsync(
         string email,
         string activationUrl,
         DateTimeOffset expiresAt,
-        CancellationToken ct = default)
-    {
-        var subject = "Activa tu cuenta en FLIT Trámites";
-        var expiresLocal = expiresAt.ToString("f");
-        var html = $"""
-            <!DOCTYPE html>
-            <html lang="es">
-            <body style="font-family:Segoe UI,Arial,sans-serif;color:#1a1a1a;">
-              <h2>Invitación a FLIT Trámites</h2>
-              <p>Has sido invitado a unirte a la plataforma. El enlace es válido por <strong>24 horas</strong>
-                 (hasta {WebUtility.HtmlEncode(expiresLocal)} UTC).</p>
-              <p><a href="{WebUtility.HtmlEncode(activationUrl)}"
-                    style="display:inline-block;padding:12px 20px;background:#2563eb;color:#fff;
-                    text-decoration:none;border-radius:6px;">Activar mi cuenta</a></p>
-              <p style="font-size:12px;color:#666;">Si el botón no funciona, copia este enlace en el navegador:<br/>
-              <span style="word-break:break-all;">{WebUtility.HtmlEncode(activationUrl)}</span></p>
-              <p style="font-size:12px;color:#999;">Este mensaje es automático; no respondas a este correo.</p>
-            </body>
-            </html>
-            """;
-
-        await sender.SendHtmlAsync(email, subject, html, ct);
-    }
+        CancellationToken ct = default) =>
+        globalEmail.SendTemplatedAsync(
+            email,
+            EmailTemplateKeys.OnboardingInvitation,
+            new Dictionary<string, string>
+            {
+                ["activation_url"] = activationUrl,
+                ["expires_at"] = expiresAt.ToString("f"),
+            },
+            ct: ct);
 }

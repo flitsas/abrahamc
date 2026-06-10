@@ -14,7 +14,7 @@ public static class TramitesOnboardingUseCases
     public const string RoleNotFoundCode = "ROLE_NOT_FOUND";
     public const string ForbiddenTenantCode = "TENANT_MISMATCH";
 
-    public static readonly TimeSpan InvitationTtl = TimeSpan.FromHours(24);
+    public static readonly TimeSpan InvitationTtl = TimeSpan.FromHours(72);
 
     public sealed record CreateInvitationCommand(
         string Email,

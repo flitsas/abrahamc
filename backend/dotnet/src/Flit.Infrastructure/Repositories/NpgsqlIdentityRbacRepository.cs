@@ -34,6 +34,36 @@ public sealed class NpgsqlIdentityRbacRepository(FlitDbContext db) : IIdentityRb
         return (bool)(await cmd.ExecuteScalarAsync(ct) ?? false);
     }
 
+    public async Task<IReadOnlyList<string?>> GetAbacConditionsForSlugAsync(
+        Guid userId, Guid tenantId, string slug, CancellationToken ct = default)
+    {
+        var conn = await GetOpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(
+            """
+            SELECT rp.abac_conditions::text
+            FROM identity.user_roles ur
+            JOIN identity.role_permissions rp
+              ON rp.role_id = ur.role_id AND rp.deleted_at IS NULL
+            JOIN identity.permissions p
+              ON p.id = rp.permission_id AND p.is_active = true AND p.slug = @slug
+            WHERE ur.user_id = @userId
+              AND ur.tenant_id = @tenantId
+              AND ur.deleted_at IS NULL
+              AND (rp.tenant_id IS NULL OR rp.tenant_id = ur.tenant_id)
+            """,
+            conn);
+        cmd.Parameters.AddWithValue("userId", userId);
+        cmd.Parameters.AddWithValue("tenantId", tenantId);
+        cmd.Parameters.AddWithValue("slug", slug);
+
+        var rows = new List<string?>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+            rows.Add(reader.IsDBNull(0) ? null : reader.GetString(0));
+
+        return rows;
+    }
+
     public async Task<IReadOnlyList<string>> GetEffectiveSlugsAsync(
         Guid userId, Guid tenantId, CancellationToken ct = default)
     {

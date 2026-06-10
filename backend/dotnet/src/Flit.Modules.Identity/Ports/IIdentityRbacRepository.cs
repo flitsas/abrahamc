@@ -8,6 +8,9 @@ public interface IIdentityRbacRepository
     Task<bool> UserHasPermissionSlugAsync(
         Guid userId, Guid tenantId, string slug, CancellationToken ct = default);
 
+    Task<IReadOnlyList<string?>> GetAbacConditionsForSlugAsync(
+        Guid userId, Guid tenantId, string slug, CancellationToken ct = default);
+
     Task<IReadOnlyList<string>> GetEffectiveSlugsAsync(
         Guid userId, Guid tenantId, CancellationToken ct = default);
 

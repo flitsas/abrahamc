@@ -131,7 +131,9 @@ public sealed class RsaJwtTokenIssuer : ITokenIssuer, IDisposable
             ["email"] = subject.Email,
             ["tenant_id"] = subject.TenantId.ToString(),
             ["is_super_admin"] = subject.IsSuperAdmin ? "true" : "false",
+            ["roles"] = string.Join(',', subject.RoleSlugs),
             ["permissions"] = string.Join(',', subject.PermissionSlugs),
+            ["permissions_epoch"] = subject.PermissionsEpoch,
             ["jti"] = Guid.CreateVersion7().ToString(),
         };
 
@@ -181,7 +183,20 @@ public sealed class RsaJwtTokenIssuer : ITokenIssuer, IDisposable
             ? Array.Empty<string>()
             : permsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-        return new TramitesSessionSubject(userId, tenantId, email, isSuperAdmin, slugs);
+        var rolesRaw = validation.Claims.TryGetValue("roles", out var rolesObj)
+            ? rolesObj?.ToString()
+            : null;
+        var roles = string.IsNullOrWhiteSpace(rolesRaw)
+            ? Array.Empty<string>()
+            : rolesRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        var epoch = validation.Claims.TryGetValue("permissions_epoch", out var epochObj) &&
+            int.TryParse(epochObj?.ToString(), out var parsedEpoch)
+            ? parsedEpoch
+            : 1;
+
+        return new TramitesSessionSubject(
+            userId, tenantId, email, isSuperAdmin, roles, slugs, epoch);
     }
 
     public Guid? ValidateRefresh(string refreshToken)

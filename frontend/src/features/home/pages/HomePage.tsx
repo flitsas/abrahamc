@@ -121,7 +121,9 @@ export function HomePage() {
                     : "Esperando respuesta del backend…"
               }
               time="Hoy"
-              state={health.isError ? "danger" : health.data ? "success" : "active"}
+              state={
+                health.isError ? "danger" : health.data ? "success" : "active"
+              }
             />
             <TimelineItem
               title="Tenant vinculado"
@@ -152,14 +154,12 @@ export function HomePage() {
                 <SummaryRow
                   label="Rol"
                   value={
-                    session.user.isSuperAdmin ? "Superadministrador" : "Operador"
+                    session.user.isSuperAdmin
+                      ? "Superadministrador"
+                      : "Operador"
                   }
                 />
-                <SummaryRow
-                  label="Tenant"
-                  value={session.user.tenantId}
-                  mono
-                />
+                <SummaryRow label="Tenant" value={session.user.tenantId} mono />
                 <SummaryRow
                   label="Permisos"
                   value={`${session.permissionSlugs.length} asignados`}
@@ -311,7 +311,15 @@ function QuickAction({
 
 function UserIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      aria-hidden="true"
+    >
       <circle cx="12" cy="8" r="4" />
       <path d="M4 20c1.5-4 6-6 8-6s6.5 2 8 6" />
     </svg>
@@ -320,7 +328,15 @@ function UserIcon() {
 
 function ShieldIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      aria-hidden="true"
+    >
       <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z" />
     </svg>
   );
@@ -328,7 +344,15 @@ function ShieldIcon() {
 
 function PulseIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      aria-hidden="true"
+    >
       <path d="M4 12h3l2-7 4 14 3-7h4" />
     </svg>
   );
@@ -336,7 +360,15 @@ function PulseIcon() {
 
 function GridIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      aria-hidden="true"
+    >
       <rect x="4" y="4" width="7" height="7" rx="1.5" />
       <rect x="13" y="4" width="7" height="7" rx="1.5" />
       <rect x="4" y="13" width="7" height="7" rx="1.5" />

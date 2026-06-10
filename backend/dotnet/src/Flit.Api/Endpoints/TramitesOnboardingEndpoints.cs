@@ -72,7 +72,7 @@ public static class TramitesOnboardingEndpoints
                     }),
                 MapCreateError);
         })
-        .RequireTramitesPermission("modulo.companias.crud-total")
+        .RequireTramitesPermission(TramitesUsersEndpoints.ManageUsersPermission)
         .WithName("TramitesCreateOnboardingInvitation");
 
         group.MapGet("/preview", async (
@@ -229,9 +229,11 @@ public static class TramitesOnboardingEndpoints
 
     private static IResult MapPreviewError(string code) => code switch
     {
-        TramitesOnboardingUseCases.InvitationExpiredCode => Results.Json(
-            new { error = code, message = "El enlace de activación expiró." },
-            statusCode: StatusCodes.Status410Gone),
+        TramitesOnboardingUseCases.InvitationExpiredCode => Results.BadRequest(new
+        {
+            error = code,
+            message = "El enlace de activación expiró.",
+        }),
         TramitesOnboardingUseCases.InvitationConsumedCode => Results.Conflict(new
         {
             error = code,

@@ -375,6 +375,11 @@ app.UseMiddleware<TenantContextMiddleware>();
 
 if (usePostgres)
 {
+    app.UseMiddleware<TramitesSessionEpochMiddleware>();
+}
+
+if (usePostgres)
+{
     app.UseMiddleware<Flit.Api.Middleware.CompaniesSessionAmbientMiddleware>();
 }
 
@@ -397,6 +402,7 @@ if (usePostgres)
     app.MapTramitesAuthEndpoints();
     app.MapTramitesRbacEndpoints();
     app.MapTramitesOnboardingEndpoints();
+    app.MapTramitesUsersEndpoints();
     app.MapTramitesAdminEndpoints();
     app.MapTramitesProfileEndpoints();
     app.MapTramitesSupportEndpoints();

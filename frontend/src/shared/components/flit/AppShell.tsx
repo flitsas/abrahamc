@@ -25,9 +25,7 @@ export function AppShell({ navItems, children }: AppShellProps) {
     navigate("/login", { replace: true });
   }
 
-  const roleLabel = session?.user.isSuperAdmin
-    ? "Superadmin"
-    : "Operador";
+  const roleLabel = session?.user.isSuperAdmin ? "Superadmin" : "Operador";
 
   return (
     <div className="min-h-screen bg-flit-bg font-flit text-flit-blueDark">

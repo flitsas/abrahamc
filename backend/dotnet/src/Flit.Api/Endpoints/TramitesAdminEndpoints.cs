@@ -8,6 +8,7 @@ namespace Flit.Api.Endpoints;
 /// <summary>Consolas Super Admin / Tenant Admin (HU #9419).</summary>
 public static class TramitesAdminEndpoints
 {
+    public const string ManageUsersPermission = TramitesUsersEndpoints.ManageUsersPermission;
     public sealed record CreateTenantRequest(string Name, string Nit, string Slug, string? SettingsJson);
 
     public sealed record UpdateTenantRequest(string? Name, string? Status, string? SettingsJson);
@@ -190,7 +191,7 @@ public static class TramitesAdminEndpoints
                 }),
                 MapTenantScopedError);
         })
-        .RequireTramitesPermission("modulo.companias.crud-total")
+        .RequireTramitesPermission(ManageUsersPermission)
         .WithName("TramitesAdminListUsers");
 
         group.MapGet("/users/{id:guid}", async (
@@ -214,7 +215,7 @@ public static class TramitesAdminEndpoints
                     ? Results.NotFound(new { error = code })
                     : MapTenantScopedError(code));
         })
-        .RequireTramitesPermission("modulo.companias.crud-total")
+        .RequireTramitesPermission(ManageUsersPermission)
         .WithName("TramitesAdminGetUser");
 
         group.MapPost("/users", async (
@@ -241,7 +242,7 @@ public static class TramitesAdminEndpoints
                 ok => Results.Created($"/api/v1/identity/admin/users/{ok.Id}", ok),
                 MapTenantScopedError);
         })
-        .RequireTramitesPermission("modulo.companias.crud-total")
+        .RequireTramitesPermission(ManageUsersPermission)
         .WithName("TramitesAdminCreateUser");
 
         group.MapPatch("/users/{id:guid}", async (
@@ -271,7 +272,7 @@ public static class TramitesAdminEndpoints
                     ? Results.NotFound(new { error = code })
                     : MapTenantScopedError(code));
         })
-        .RequireTramitesPermission("modulo.companias.crud-total")
+        .RequireTramitesPermission(ManageUsersPermission)
         .WithName("TramitesAdminUpdateUser");
 
         group.MapGet("/roles", async (
@@ -292,7 +293,7 @@ public static class TramitesAdminEndpoints
                 ok => Results.Ok(ok),
                 MapTenantScopedError);
         })
-        .RequireTramitesPermission("modulo.companias.crud-total")
+        .RequireTramitesPermission(ManageUsersPermission)
         .WithName("TramitesAdminListRoles");
 
         group.MapPut("/users/{userId:guid}/roles/{roleId:guid}", async (
@@ -315,7 +316,7 @@ public static class TramitesAdminEndpoints
                 _ => Results.NoContent(),
                 MapTenantScopedError);
         })
-        .RequireTramitesPermission("modulo.companias.crud-total")
+        .RequireTramitesPermission(ManageUsersPermission)
         .WithName("TramitesAdminAssignRole");
 
         group.MapDelete("/users/{userId:guid}/roles/{roleId:guid}", async (
@@ -340,7 +341,7 @@ public static class TramitesAdminEndpoints
                     ? Results.NotFound(new { error = code })
                     : MapTenantScopedError(code));
         })
-        .RequireTramitesPermission("modulo.companias.crud-total")
+        .RequireTramitesPermission(ManageUsersPermission)
         .WithName("TramitesAdminRemoveRole");
     }
 

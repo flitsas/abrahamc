@@ -74,6 +74,85 @@ public sealed class NpgsqlIdentityAccountRepository(FlitDbContext db) : IIdentit
         return slugs;
     }
 
+    public async Task<UserAuthContext> GetAuthContextAsync(
+        Guid userId, Guid tenantId, CancellationToken ct = default)
+    {
+        var conn = await GetOpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(
+            """
+            WITH role_slugs AS (
+              SELECT DISTINCT r.slug
+              FROM identity.user_roles ur
+              JOIN identity.roles r ON r.id = ur.role_id AND r.deleted_at IS NULL
+              WHERE ur.user_id = @userId
+                AND ur.tenant_id = @tenantId
+                AND ur.deleted_at IS NULL
+            ),
+            perm_slugs AS (
+              SELECT DISTINCT p.slug
+              FROM identity.user_roles ur
+              JOIN identity.role_permissions rp
+                ON rp.role_id = ur.role_id AND rp.deleted_at IS NULL
+              JOIN identity.permissions p
+                ON p.id = rp.permission_id AND p.is_active = true
+              WHERE ur.user_id = @userId
+                AND ur.tenant_id = @tenantId
+                AND ur.deleted_at IS NULL
+                AND (rp.tenant_id IS NULL OR rp.tenant_id = ur.tenant_id)
+            )
+            SELECT
+              COALESCE((SELECT array_agg(slug ORDER BY slug) FROM role_slugs), ARRAY[]::text[]),
+              COALESCE((SELECT array_agg(slug ORDER BY slug) FROM perm_slugs), ARRAY[]::text[]),
+              u.permissions_epoch
+            FROM identity.users u
+            WHERE u.id = @userId AND u.deleted_at IS NULL
+            """,
+            conn);
+        cmd.Parameters.AddWithValue("userId", userId);
+        cmd.Parameters.AddWithValue("tenantId", tenantId);
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        if (!await reader.ReadAsync(ct))
+            return new UserAuthContext([], [], 1);
+
+        var roles = reader.GetFieldValue<string[]>(0);
+        var perms = reader.GetFieldValue<string[]>(1);
+        var epoch = reader.GetInt32(2);
+        return new UserAuthContext(roles, perms, epoch);
+    }
+
+    public async Task<int> GetPermissionsEpochAsync(Guid userId, CancellationToken ct = default)
+    {
+        var conn = await GetOpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(
+            """
+            SELECT permissions_epoch
+            FROM identity.users
+            WHERE id = @userId AND deleted_at IS NULL
+            """,
+            conn);
+        cmd.Parameters.AddWithValue("userId", userId);
+        var result = await cmd.ExecuteScalarAsync(ct);
+        return result is int epoch ? epoch : 1;
+    }
+
+    public async Task<int> BumpPermissionsEpochAsync(Guid userId, CancellationToken ct = default)
+    {
+        var conn = await GetOpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(
+            """
+            UPDATE identity.users
+            SET permissions_epoch = permissions_epoch + 1,
+                updated_at = now()
+            WHERE id = @userId AND deleted_at IS NULL
+            RETURNING permissions_epoch
+            """,
+            conn);
+        cmd.Parameters.AddWithValue("userId", userId);
+        var result = await cmd.ExecuteScalarAsync(ct);
+        return result is int epoch ? epoch : 1;
+    }
+
     public async Task<bool> IsSuperAdminAsync(Guid userId, CancellationToken ct = default)
     {
         var conn = await GetOpenConnectionAsync(ct);

@@ -1,5 +1,9 @@
+import { PermissionGate } from "../../auth/components/PermissionGate.js";
+import { PERMISSIONS } from "../../auth/lib/permissions.js";
 import { useAuthMe } from "../../auth/api/auth.api.js";
 import { useProcedureTypes } from "../api/procedures.api.js";
+import { GradientButton } from "../../../shared/components/flit/GradientButton.js";
+import { PageHeaderCard } from "../../../shared/components/flit/PageHeaderCard.js";
 import { EmptyState } from "../../../shared/components/ui/EmptyState.js";
 import { ErrorState } from "../../../shared/components/ui/ErrorState.js";
 import { LoadingSkeleton } from "../../../shared/components/ui/LoadingSkeleton.js";
@@ -12,14 +16,23 @@ export function ProceduresPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold text-slate-900">
-          Tipos de trámite
-        </h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Catálogo activo para el tenant de tu sesión.
-        </p>
-      </header>
+      <PageHeaderCard
+        title="Tipos de trámite"
+        subtitle="Catálogo activo para el tenant de tu sesión."
+        actions={
+          <PermissionGate permission={PERMISSIONS.generateConsolidated}>
+            <GradientButton
+              type="button"
+              className="!h-12 !w-auto !px-8 !text-sm"
+              onClick={() => {
+                // Placeholder: acción consolidado se implementará en feature OT
+              }}
+            >
+              Generar consolidado
+            </GradientButton>
+          </PermissionGate>
+        }
+      />
 
       {isLoading && <LoadingSkeleton rows={5} />}
       {isError && <ErrorState error={error} onRetry={() => refetch()} />}

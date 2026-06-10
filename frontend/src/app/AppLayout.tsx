@@ -1,9 +1,21 @@
+import type { ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { RequirePermissionRoute } from "../features/auth/components/RequirePermissionRoute.js";
+import { PERMISSIONS } from "../features/auth/lib/permissions.js";
+import { usePermission } from "../features/auth/hooks/usePermission.js";
 import { HomePage } from "../features/home/pages/HomePage.js";
+import { UsersAdminPage } from "../features/identity-admin/pages/UsersAdminPage.js";
 import { ProceduresPage } from "../features/procedures/pages/ProceduresPage.js";
 import { AppShell } from "../shared/components/flit/AppShell.js";
 
-export const APP_NAV_ITEMS = [
+type NavItem = {
+  id: string;
+  to: string;
+  label: string;
+  icon: ReactNode;
+};
+
+const BASE_NAV_ITEMS: NavItem[] = [
   {
     id: "home",
     to: "/",
@@ -47,26 +59,72 @@ export const APP_NAV_ITEMS = [
   },
 ];
 
+const USERS_NAV_ITEM: NavItem = {
+  id: "users",
+  to: "/admin/usuarios",
+  label: "Usuarios",
+  icon: (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+    </svg>
+  ),
+};
+
+function useAppNavItems(): NavItem[] {
+  const canManageUsers = usePermission(PERMISSIONS.manageUsers);
+  return canManageUsers ? [...BASE_NAV_ITEMS, USERS_NAV_ITEM] : BASE_NAV_ITEMS;
+}
+
 type AppLayoutProps = {
   previewPath?: string;
 };
 
 export function AppLayout({ previewPath }: AppLayoutProps) {
+  const navItems = useAppNavItems();
+
   if (previewPath) {
     return (
-      <AppShell navItems={APP_NAV_ITEMS}>
-        {previewPath === "/tramites" ? <ProceduresPage /> : <HomePage />}
+      <AppShell navItems={navItems}>
+        {previewPath === "/tramites" ? (
+          <ProceduresPage />
+        ) : previewPath === "/admin/usuarios" ? (
+          <UsersAdminPage />
+        ) : (
+          <HomePage />
+        )}
       </AppShell>
     );
   }
 
   return (
-    <AppShell navItems={APP_NAV_ITEMS}>
+    <AppShell navItems={navItems}>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/tramites" element={<ProceduresPage />} />
+        <Route
+          path="/admin/usuarios"
+          element={
+            <RequirePermissionRoute permission={PERMISSIONS.manageUsers}>
+              <UsersAdminPage />
+            </RequirePermissionRoute>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppShell>
   );
 }
+
+export const APP_NAV_ITEMS = BASE_NAV_ITEMS;

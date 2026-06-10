@@ -36,6 +36,7 @@ public static class InfrastructureExtensions
         IHostEnvironment environment)
     {
         services.AddFlitSmtpEmail(configuration);
+        services.AddFlitGlobalEmail(configuration);
         services.AddFlitMultiTenant();
         services.AddScoped<Flit.SharedKernel.ITenantContext, SharedKernelTenantBridge>();
         services.AddScoped<PostgresRlsSession>();
@@ -84,6 +85,8 @@ public static class InfrastructureExtensions
             Flit.Modules.Identity.Application.TramitesPermissionVerifier>();
         services.AddScoped<Flit.Modules.Identity.Ports.IIdentityOnboardingRepository,
             NpgsqlIdentityOnboardingRepository>();
+        services.AddScoped<Flit.Modules.Identity.Ports.IIdentityPasswordResetRepository,
+            NpgsqlIdentityPasswordResetRepository>();
         services.AddScoped<Flit.Modules.Identity.Ports.IIdentityAdminRepository,
             NpgsqlIdentityAdminRepository>();
         services.AddScoped<Flit.Modules.Identity.Ports.IIdentityProfileRepository,

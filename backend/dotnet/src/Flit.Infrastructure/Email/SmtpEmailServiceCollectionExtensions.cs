@@ -14,15 +14,20 @@ public static class SmtpEmailServiceCollectionExtensions
     {
         services.AddOptions<SmtpEmailOptions>()
             .Bind(configuration.GetSection(SmtpEmailOptions.SectionName))
-            .PostConfigure<IConfiguration>(ApplyEnvironmentOverrides);
+            .PostConfigure<IConfiguration>((opts, config) =>
+            {
+                ApplyEnvironmentOverrides(opts, config);
+                ApplySmtpSectionAliases(opts, config.GetSection(SmtpOptions.SectionName));
+            });
 
         services.AddSingleton<SmtpEmailSender>();
-        services.AddSingleton<SmtpOnboardingEmailNotifier>();
-        services.AddSingleton<NoOpOnboardingEmailNotifier>();
-        services.AddSingleton<IOnboardingEmailNotifier>(sp =>
+        services.AddScoped<SmtpOnboardingEmailNotifier>();
+        services.AddScoped<NoOpOnboardingEmailNotifier>();
+        services.AddScoped<IOnboardingEmailNotifier>(sp =>
         {
-            var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<SmtpEmailOptions>>().Value;
-            return opts.IsConfigured
+            var smtpOpts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<SmtpOptions>>().Value;
+            var legacyOpts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<SmtpEmailOptions>>().Value;
+            return smtpOpts.IsConfigured || legacyOpts.IsConfigured
                 ? sp.GetRequiredService<SmtpOnboardingEmailNotifier>()
                 : sp.GetRequiredService<NoOpOnboardingEmailNotifier>();
         });
@@ -45,4 +50,25 @@ public static class SmtpEmailServiceCollectionExtensions
         if (bool.TryParse(config["SMTP_USE_STARTTLS"], out var tls))
             opts.UseStartTls = tls;
     }
+
+  private static void ApplySmtpSectionAliases(SmtpEmailOptions opts, IConfigurationSection smtp)
+  {
+    if (string.IsNullOrWhiteSpace(opts.Host))
+      opts.Host = smtp["Host"];
+
+    if (opts.Port == 587 && int.TryParse(smtp["Port"], out var port))
+      opts.Port = port;
+
+    if (string.IsNullOrWhiteSpace(opts.DefaultSenderEmail))
+      opts.DefaultSenderEmail = smtp["User"] ?? smtp["From"];
+
+    if (string.IsNullOrWhiteSpace(opts.DefaultSenderPassword))
+      opts.DefaultSenderPassword = smtp["Password"];
+
+    if (!string.IsNullOrWhiteSpace(smtp["FromName"]))
+      opts.DefaultSenderName = smtp["FromName"]!;
+
+    if (smtp.GetValue<bool?>("EnableSsl") is true)
+      opts.UseStartTls = true;
+  }
 }

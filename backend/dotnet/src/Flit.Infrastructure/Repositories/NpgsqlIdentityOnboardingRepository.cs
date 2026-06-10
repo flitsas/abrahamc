@@ -93,7 +93,7 @@ public sealed class NpgsqlIdentityOnboardingRepository(FlitDbContext db) : IIden
             """
             SELECT id FROM identity.users
             WHERE tenant_id = @tenantId AND email = @email::citext
-              AND account_state = 'inactive' AND deleted_at IS NULL
+              AND account_state IN ('inactive', 'pending') AND deleted_at IS NULL
             LIMIT 1
             """,
             conn);
@@ -116,7 +116,7 @@ public sealed class NpgsqlIdentityOnboardingRepository(FlitDbContext db) : IIden
             INSERT INTO identity.users (
               id, tenant_id, email, password_hash, account_state, created_by, updated_by
             ) VALUES (
-              @id, @tenantId, @email::citext, NULL, 'inactive', @createdBy, @createdBy
+              @id, @tenantId, @email::citext, NULL, 'pending', @createdBy, @createdBy
             )
             """,
             conn);

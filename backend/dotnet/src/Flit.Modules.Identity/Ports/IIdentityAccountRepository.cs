@@ -11,6 +11,13 @@ public interface IIdentityAccountRepository
 
     Task<IReadOnlyList<string>> GetPermissionSlugsAsync(Guid userId, Guid tenantId, CancellationToken ct = default);
 
+    /// <summary>Unión aditiva de roles y permisos del usuario en el tenant (#9683).</summary>
+    Task<UserAuthContext> GetAuthContextAsync(Guid userId, Guid tenantId, CancellationToken ct = default);
+
+    Task<int> GetPermissionsEpochAsync(Guid userId, CancellationToken ct = default);
+
+    Task<int> BumpPermissionsEpochAsync(Guid userId, CancellationToken ct = default);
+
     Task<bool> IsSuperAdminAsync(Guid userId, CancellationToken ct = default);
 
     Task RecordLoginAttemptAsync(

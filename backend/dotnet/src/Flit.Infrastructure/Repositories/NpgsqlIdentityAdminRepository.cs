@@ -457,7 +457,9 @@ public sealed class NpgsqlIdentityAdminRepository(FlitDbContext db) : IIdentityA
         CancellationToken ct = default)
     {
         var conn = await GetOpenConnectionAsync(ct);
-        await using var cmd = new NpgsqlCommand(
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        await using (var cmd = new NpgsqlCommand(
             """
             INSERT INTO identity.user_roles (tenant_id, user_id, role_id, created_by, updated_by)
             VALUES (@tenantId, @userId, @roleId, @actorId, @actorId)
@@ -465,12 +467,17 @@ public sealed class NpgsqlIdentityAdminRepository(FlitDbContext db) : IIdentityA
               SET deleted_at = NULL, deleted_by = NULL, updated_at = now(), updated_by = @actorId
               WHERE identity.user_roles.deleted_at IS NOT NULL
             """,
-            conn);
-        cmd.Parameters.AddWithValue("tenantId", tenantId);
-        cmd.Parameters.AddWithValue("userId", userId);
-        cmd.Parameters.AddWithValue("roleId", roleId);
-        cmd.Parameters.AddWithValue("actorId", actorId);
-        await cmd.ExecuteNonQueryAsync(ct);
+            conn, tx))
+        {
+            cmd.Parameters.AddWithValue("tenantId", tenantId);
+            cmd.Parameters.AddWithValue("userId", userId);
+            cmd.Parameters.AddWithValue("roleId", roleId);
+            cmd.Parameters.AddWithValue("actorId", actorId);
+            await cmd.ExecuteNonQueryAsync(ct);
+        }
+
+        await BumpPermissionsEpochAsync(conn, tx, userId, ct);
+        await tx.CommitAsync(ct);
     }
 
     public async Task<bool> RemoveUserRoleAsync(
@@ -481,6 +488,8 @@ public sealed class NpgsqlIdentityAdminRepository(FlitDbContext db) : IIdentityA
         CancellationToken ct = default)
     {
         var conn = await GetOpenConnectionAsync(ct);
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
         await using var cmd = new NpgsqlCommand(
             """
             UPDATE identity.user_roles
@@ -488,12 +497,36 @@ public sealed class NpgsqlIdentityAdminRepository(FlitDbContext db) : IIdentityA
             WHERE tenant_id = @tenantId AND user_id = @userId AND role_id = @roleId
               AND deleted_at IS NULL
             """,
-            conn);
+            conn, tx);
         cmd.Parameters.AddWithValue("tenantId", tenantId);
         cmd.Parameters.AddWithValue("userId", userId);
         cmd.Parameters.AddWithValue("roleId", roleId);
         cmd.Parameters.AddWithValue("actorId", actorId);
-        return await cmd.ExecuteNonQueryAsync(ct) > 0;
+        var removed = await cmd.ExecuteNonQueryAsync(ct) > 0;
+
+        if (removed)
+            await BumpPermissionsEpochAsync(conn, tx, userId, ct);
+
+        await tx.CommitAsync(ct);
+        return removed;
+    }
+
+    private static async Task BumpPermissionsEpochAsync(
+        NpgsqlConnection conn,
+        NpgsqlTransaction tx,
+        Guid userId,
+        CancellationToken ct)
+    {
+        await using var cmd = new NpgsqlCommand(
+            """
+            UPDATE identity.users
+            SET permissions_epoch = permissions_epoch + 1,
+                updated_at = now()
+            WHERE id = @userId AND deleted_at IS NULL
+            """,
+            conn, tx);
+        cmd.Parameters.AddWithValue("userId", userId);
+        await cmd.ExecuteNonQueryAsync(ct);
     }
 
     private static TenantRow MapTenant(NpgsqlDataReader reader) =>

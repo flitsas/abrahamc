@@ -1,10 +1,11 @@
 using Flit.Infrastructure.MultiTenant;
 using Flit.Modules.Identity.Application;
+using Flit.Modules.Identity.Domain;
 using Flit.Modules.Identity.Ports;
 
 namespace Flit.Api.Auth;
 
-/// <summary>Filtro de endpoint que exige un slug activo en BD (HU #9417).</summary>
+/// <summary>Filtro de endpoint que exige un slug activo en BD (HU #9417) + ABAC (#9684).</summary>
 public sealed class TramitesPermissionFilter(string requiredSlug) : IEndpointFilter
 {
     public async ValueTask<object?> InvokeAsync(
@@ -36,11 +37,15 @@ public sealed class TramitesPermissionFilter(string requiredSlug) : IEndpointFil
         if (!tenantContext.UserId.HasValue || !tenantContext.TenantId.HasValue)
             return Results.Unauthorized();
 
-        var allowed = await verifier.HasSlugAsync(
+        // ABAC solo cuando el endpoint establece contexto explícito (recurso concreto).
+        var abacContext = TramitesAbacHttpContext.GetAbacContext(http);
+
+        var allowed = await verifier.HasSlugWithAbacAsync(
             tenantContext.UserId.Value,
             tenantContext.TenantId.Value,
             tenantContext.IsSuperAdmin,
             requiredSlug,
+            abacContext,
             http.RequestAborted);
 
         if (!allowed)
@@ -48,7 +53,10 @@ public sealed class TramitesPermissionFilter(string requiredSlug) : IEndpointFil
             return Results.Json(
                 new
                 {
-                    error = TramitesRbacUseCases.ForbiddenCode,
+                    error = abacContext?.ResourceOwnerUserId is not null &&
+                            abacContext.ResourceOwnerUserId != tenantContext.UserId
+                        ? TramitesAbacCodes.Denied
+                        : TramitesRbacUseCases.ForbiddenCode,
                     message = $"Permiso requerido: {requiredSlug}",
                     requiredSlug,
                 },

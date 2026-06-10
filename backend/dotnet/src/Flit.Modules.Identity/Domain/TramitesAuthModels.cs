@@ -10,12 +10,20 @@ public sealed record AuthUserRow(
     string AccountState,
     DateTimeOffset? BlockedUntil);
 
+/// <summary>Roles y permisos efectivos (unión aditiva multi-rol) + epoch de sesión (#9683).</summary>
+public sealed record UserAuthContext(
+    IReadOnlyList<string> RoleSlugs,
+    IReadOnlyList<string> PermissionSlugs,
+    int PermissionsEpoch);
+
 public sealed record TramitesSessionSubject(
     Guid UserId,
     Guid TenantId,
     string Email,
     bool IsSuperAdmin,
-    IReadOnlyList<string> PermissionSlugs);
+    IReadOnlyList<string> RoleSlugs,
+    IReadOnlyList<string> PermissionSlugs,
+    int PermissionsEpoch);
 
 public sealed record TramitesLoginResponse(
     Guid UserId,
@@ -23,5 +31,6 @@ public sealed record TramitesLoginResponse(
     Guid TenantId,
     string AccountState,
     bool IsSuperAdmin,
+    IReadOnlyList<string> RoleSlugs,
     IReadOnlyList<string> PermissionSlugs,
     int ExpiresInSeconds);

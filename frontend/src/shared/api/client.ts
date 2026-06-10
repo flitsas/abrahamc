@@ -1,4 +1,5 @@
 import axios from "axios";
+import { notifyPermissionsStale } from "../lib/permissionsStale.js";
 
 /**
  * En desarrollo usamos ruta relativa para que el proxy de Vite (`/api` → :3030)
@@ -42,11 +43,21 @@ function resolveApiErrorMessage(error: unknown): string {
 
 apiClient.interceptors.response.use(
   (res) => res,
-  (error) =>
-    Promise.reject(
+  (error) => {
+    if (axios.isAxiosError(error) && error.response?.status === 403) {
+      const data = error.response.data as { error?: string } | undefined;
+      if (data?.error === "PERMISSIONS_STALE") {
+        if (!window.location.pathname.startsWith("/login")) {
+          notifyPermissionsStale();
+        }
+      }
+    }
+
+    return Promise.reject(
       new ApiError(
         resolveApiErrorMessage(error),
         axios.isAxiosError(error) ? error.response?.status : undefined,
       ),
-    ),
+    );
+  },
 );

@@ -11,6 +11,7 @@ public static class TramitesAuthUseCases
 {
     public const string InvalidCredentialsCode = "INVALID_CREDENTIALS";
     public const string AccountNotActiveCode = "ACCOUNT_NOT_ACTIVE";
+    public const string PermissionsStaleCode = "PERMISSIONS_STALE";
 
     public sealed record LoginCommand(string Email, string Password, string? IpAddress, string? UserAgent);
 
@@ -111,10 +112,11 @@ public static class TramitesAuthUseCases
         await accounts.ResetFailedAttemptsAsync(user.Id, ct);
 
         var isSuperAdmin = await accounts.IsSuperAdminAsync(user.Id, ct);
-        var slugs = await accounts.GetPermissionSlugsAsync(user.Id, user.TenantId, ct);
+        var authCtx = await accounts.GetAuthContextAsync(user.Id, user.TenantId, ct);
 
         var subject = new TramitesSessionSubject(
-            user.Id, user.TenantId, email, isSuperAdmin, slugs);
+            user.Id, user.TenantId, email, isSuperAdmin,
+            authCtx.RoleSlugs, authCtx.PermissionSlugs, authCtx.PermissionsEpoch);
 
         var (accessToken, accessExp) = tokenIssuer.IssueTramitesAccess(subject);
         var refreshToken = GenerateOpaqueRefreshToken();
@@ -131,7 +133,7 @@ public static class TramitesAuthUseCases
 
         var response = new TramitesLoginResponse(
             user.Id, email, user.TenantId, user.AccountState,
-            isSuperAdmin, slugs,
+            isSuperAdmin, authCtx.RoleSlugs, authCtx.PermissionSlugs,
             (int)(accessExp - clock.UtcNow).TotalSeconds);
 
         return Result<LoginSuccess, LoginFailure>.Success(
@@ -164,9 +166,10 @@ public static class TramitesAuthUseCases
 
         var email = user.Email;
         var isSuperAdmin = await accounts.IsSuperAdminAsync(user.Id, ct);
-        var slugs = await accounts.GetPermissionSlugsAsync(user.Id, user.TenantId, ct);
+        var authCtx = await accounts.GetAuthContextAsync(user.Id, user.TenantId, ct);
         var subject = new TramitesSessionSubject(
-            user.Id, user.TenantId, email, isSuperAdmin, slugs);
+            user.Id, user.TenantId, email, isSuperAdmin,
+            authCtx.RoleSlugs, authCtx.PermissionSlugs, authCtx.PermissionsEpoch);
 
         var (accessToken, accessExp) = tokenIssuer.IssueTramitesAccess(subject);
         var newRefresh = GenerateOpaqueRefreshToken();
@@ -179,7 +182,7 @@ public static class TramitesAuthUseCases
 
         var response = new TramitesLoginResponse(
             user.Id, email, user.TenantId, user.AccountState,
-            isSuperAdmin, slugs,
+            isSuperAdmin, authCtx.RoleSlugs, authCtx.PermissionSlugs,
             (int)(accessExp - clock.UtcNow).TotalSeconds);
 
         return Result<LoginSuccess, LoginFailure>.Success(
