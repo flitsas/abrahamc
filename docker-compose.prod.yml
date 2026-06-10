@@ -1,35 +1,113 @@
-# Production docker-compose — used on the VPS.
-# PostgreSQL runs on the host machine (not in Docker).
-# Copy this file to the deploy directory on the VPS.
-# Create a .env file alongside it with the variables listed below.
+# Production docker-compose — VPS deploy (topologia slim: front + gateway + core-api).
 #
-# Required .env variables:
-#   ConnectionStrings__Core — full connection string to the host PostgreSQL
-#                             e.g. Host=host.docker.internal;Port=5432;Database=flit_prod;Username=flit;Password=***
-#   Cors__AllowedOrigins    — public URL of the frontend (e.g. https://app.tudominio.com)
+# Postgres NO esta aqui: corre en el HOST (host.docker.internal:5432).
+# El reverse-proxy del HOST termina TLS y enruta los dominios a los puertos
+# publicados en 127.0.0.1:
+#   jormanc.flitsas.online      -> frontend  (127.0.0.1:60106)
+#   api.jormanc.flitsas.online  -> gateway   (127.0.0.1:60206)  [API publica YARP]
+#   core.jormanc.flitsas.online -> core-api  (127.0.0.1:60306)  [Flit.Api interno/debug]
 #
-# Optional .env variables:
-#   PUBLIC_PORT             — host port to expose frontend (default: 8090)
-#   ASPNETCORE_ENVIRONMENT  — default: Production
+# Variables requeridas en .env (junto al compose):
+#   CONNECTION_STRING_CORE  cadena Npgsql .NET (Host=...;Port=5432;Database=...;Username=...;Password=...)
+#   CORS_ORIGIN             origen permitido del frontend (https://jormanc.flitsas.online)
+#   VERIFIK_API_TOKEN       token Verifik (RUNT)
+# Variables para AISLAR este proyecto del resto del VPS (UNICAS por proyecto):
+#   COMPOSE_PROJECT_NAME    nombre del proyecto Compose (default: flit-prod)
+#   FRONTEND_PORT / GATEWAY_PORT / CORE_API_PORT   puertos host 127.0.0.1 (defaults: 60106/60206/60306)
+# Variables opcionales:
+#   CORE_API_TAG / FRONTEND_TAG   tag de imagen (default: latest)
+#   VERIFIK_BASE_URL / VERIFIK_TIMEOUT_SECONDS
+#
+# NOTA: login deshabilitado temporalmente -> NO se requieren llaves JWT.
+#
+# Despliegue:
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+# Nombre del proyecto: UNICO por proyecto en el VPS. Si dos repos comparten el
+# mismo nombre, `up --remove-orphans` borra los contenedores del otro. Sobrescribir
+# con COMPOSE_PROJECT_NAME en el .env de cada proyecto.
+name: ${COMPOSE_PROJECT_NAME:-abrahamc-dev}
+
+x-restart-policy: &restart unless-stopped
+
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
 
 services:
+  # ── Flit.Api (interno, detras de YARP) ────────────────────────────────────
   core-api:
-    image: ghcr.io/flitsas/abrahamc/core-api:latest
+    image: ghcr.io/flitsas/abrahamc-dev/core-api:${CORE_API_TAG:-latest}
+    command: ["dotnet", "/app/api/Flit.Api.dll"]
+    # content root = working_dir, para que .NET encuentre su appsettings.json
+    working_dir: /app/api
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    ports:
-      - "127.0.0.1:3030:8081"
     environment:
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      ASPNETCORE_URLS: http://+:8081
-      ConnectionStrings__Core: ${ConnectionStrings__Core}
-      Cors__AllowedOrigins: ${Cors__AllowedOrigins}
-    restart: unless-stopped
-
-  frontend:
-    image: ghcr.io/flitsas/abrahamc/frontend:latest
+      ASPNETCORE_ENVIRONMENT: Develop
+      ASPNETCORE_URLS: http://+:80
+      ConnectionStrings__Core: ${CONNECTION_STRING_CORE}
+      Cors__AllowedOrigins: ${CORS_ORIGIN:-https://dev.abrahamc.flitsas.online}
+      # Login deshabilitado temporalmente: DevGenerate evita exigir llaves JWT
+      # montadas. Para reactivar login, montar jwt-private/public.pem y quitar esto.
+      Jwt__DevGenerate: "true"
+      Verifik__ApiToken: ${VERIFIK_API_TOKEN:-}
+      Verifik__BaseUrl: ${VERIFIK_BASE_URL:-https://api.verifik.co}
+      Verifik__AuthScheme: ${VERIFIK_AUTH_SCHEME:-Bearer}
+      Verifik__TimeoutSeconds: ${VERIFIK_TIMEOUT_SECONDS:-30}
+      Smtp__Host: ${SMTP_HOST:-}
+      Smtp__Port: ${SMTP_PORT:-587}
+      Smtp__EnableSsl: "true"
+      Smtp__User: ${SMTP_USER:-}
+      Smtp__Password: ${SMTP_PASSWORD:-}
+      Smtp__From: ${SMTP_FROM:-}
+      Smtp__FromName: ${SMTP_FROM_NAME:-FLIT Tramites}
     ports:
-      - "127.0.0.1:${PUBLIC_PORT:-8090}:80"
+      - "127.0.0.1:${CORE_API_PORT:-40305}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    restart: *restart
+    logging: *default-logging
+
+  # ── Flit.Gateway (API publica YARP: /api, /hubs) ──────────────────────────
+  gateway:
+    image: ghcr.io/flitsas/abrahamc-dev/core-api:${CORE_API_TAG:-latest}
+    command: ["dotnet", "/app/gateway/Flit.Gateway.dll"]
+    # content root = working_dir, para que YARP cargue sus rutas de appsettings.json
+    working_dir: /app/gateway
+    environment:
+      ASPNETCORE_ENVIRONMENT: Develop
+      ASPNETCORE_URLS: http://+:80
+      Cors__AllowedOrigins__0: ${CORS_ORIGIN:-https://dev.abrahamc.flitsas.online}
+      # Login deshabilitado temporalmente: sin llave JWT el gateway no valida firma
+      # ni exige autenticación (ver Flit.Gateway/Program.cs).
+    ports:
+      - "127.0.0.1:${GATEWAY_PORT:-40205}:80"
     depends_on:
-      - core-api
-    restart: unless-stopped
+      core-api:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: *restart
+    logging: *default-logging
+
+  # ── Frontend (React/Vite + nginx, solo estaticos) ─────────────────────────
+  frontend:
+    image: ghcr.io/flitsas/abrahamc-dev/frontend:${FRONTEND_TAG:-latest}
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-40105}:80"
+    depends_on:
+      - gateway
+    restart: *restart
+    logging: *default-logging

@@ -48,7 +48,8 @@ public sealed class GlobalEmailService(
     ArgumentException.ThrowIfNullOrWhiteSpace(htmlBody);
 
     if (!IsConfigured)
-      throw new InvalidOperationException("SMTP no configurado. Define la sección 'Smtp' en appsettings.");
+      throw new InvalidOperationException(
+        "SMTP no configurado. Define SMTP_* en el archivo env de la raíz o la sección 'Smtp'.");
 
     await smtp.SendHtmlAsync(recipientEmail, subject, htmlBody, ct);
   }

@@ -17,9 +17,12 @@ using Flit.Modules.Integrations.Application;
 using Flit.Modules.Integrations.Ports;
 using Flit.SharedKernel;
 using Flit.SharedKernel.Pdf;
+using Flit.Infrastructure.Configuration;
 
 // FLIT 2.0 — base limpia post-reset trámites (2026-06).
 // Superficie API: health, users, RBAC, auth, menú/permisos del usuario actual.
+
+FlitEnvFileLoader.LoadIfPresent();
 
 var builder = WebApplication.CreateBuilder(args);
 

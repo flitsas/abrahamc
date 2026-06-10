@@ -38,8 +38,19 @@ public static class SmtpEmailServiceCollectionExtensions
     private static void ApplyEnvironmentOverrides(SmtpEmailOptions opts, IConfiguration config)
     {
         opts.Host ??= config["SMTP_HOST"];
-        opts.DefaultSenderEmail ??= config["SMTP_EMAIL_DEFAULT_SENDER_EMAIL"];
-        opts.DefaultSenderPassword ??= config["SMTP_EMAIL_DEFAULT_SENDER_PASSWORD"];
+        opts.DefaultSenderEmail ??= config["SMTP_USER"]
+            ?? config["SMTP_FROM"]
+            ?? config["SMTP_EMAIL_DEFAULT_SENDER_EMAIL"];
+        opts.DefaultSenderPassword ??= config["SMTP_PASSWORD"]
+            ?? config["SMTP_EMAIL_DEFAULT_SENDER_PASSWORD"];
+
+        if (string.IsNullOrWhiteSpace(opts.DefaultSenderName) ||
+            opts.DefaultSenderName == "FLIT Trámites")
+        {
+            var fromName = config["SMTP_FROM_NAME"];
+            if (!string.IsNullOrWhiteSpace(fromName))
+                opts.DefaultSenderName = fromName;
+        }
 
         if (int.TryParse(config["SMTP_PORT"], out var port))
             opts.Port = port;

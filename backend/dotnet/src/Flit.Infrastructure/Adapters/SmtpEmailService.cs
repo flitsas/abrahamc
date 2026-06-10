@@ -19,7 +19,7 @@ public sealed class SmtpEmailService(IOptions<SmtpOptions> options)
         var opts = options.Value;
         if (string.IsNullOrWhiteSpace(opts.Host))
             throw new InvalidOperationException(
-                "SMTP no configurado. Define la sección 'Smtp' en appsettings.Development.json.");
+                "SMTP no configurado. Define SMTP_* en el archivo env de la raíz o la sección 'Smtp'.");
 
         if (string.IsNullOrWhiteSpace(opts.From))
             throw new InvalidOperationException("Smtp:From es requerido.");
