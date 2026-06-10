@@ -25,7 +25,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Audit frontend dependencies
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: services/core-api/global.json
+
+      - name: Backend audit
+        working-directory: services/core-api
+        run: |
+          dotnet restore
+          dotnet list package --vulnerable --include-transitive
+
+      - name: Frontend audit
         run: pnpm --filter @flit/frontend audit --prod --audit-level high
 
   secret-scan:

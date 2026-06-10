@@ -53,8 +53,8 @@ jobs:
       - name: Build and push core-api
         uses: docker/build-push-action@v6
         with:
-          context: ./backend/dotnet
-          file: ./backend/dotnet/Dockerfile
+          context: ./services/core-api
+          file: ./services/core-api/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
