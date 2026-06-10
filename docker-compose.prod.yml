@@ -15,7 +15,8 @@
 #   COMPOSE_PROJECT_NAME    nombre del proyecto Compose (default: flit-prod)
 #   FRONTEND_PORT / GATEWAY_PORT / CORE_API_PORT   puertos host 127.0.0.1 (defaults: 60106/60206/60306)
 # Variables opcionales:
-#   CORE_API_TAG / FRONTEND_TAG   tag de imagen (default: latest)
+#   GHCR_NAMESPACE                paquete GHCR (default: abrahamc-dev)
+#   CORE_API_TAG / FRONTEND_TAG   tag de imagen (default: develop)
 #   VERIFIK_BASE_URL / VERIFIK_TIMEOUT_SECONDS
 #
 # NOTA: login deshabilitado temporalmente -> NO se requieren llaves JWT.
@@ -40,7 +41,7 @@ x-default-logging: &default-logging
 services:
   # ── Flit.Api (interno, detras de YARP) ────────────────────────────────────
   core-api:
-    image: ghcr.io/flitsas/abrahamc-dev/core-api:${CORE_API_TAG:-latest}
+    image: ghcr.io/flitsas/${GHCR_NAMESPACE:-abrahamc-dev}/core-api:${CORE_API_TAG:-develop}
     command: ["dotnet", "/app/api/Flit.Api.dll"]
     # content root = working_dir, para que .NET encuentre su appsettings.json
     working_dir: /app/api
@@ -78,7 +79,7 @@ services:
 
   # ── Flit.Gateway (API publica YARP: /api, /hubs) ──────────────────────────
   gateway:
-    image: ghcr.io/flitsas/abrahamc-dev/core-api:${CORE_API_TAG:-latest}
+    image: ghcr.io/flitsas/${GHCR_NAMESPACE:-abrahamc-dev}/core-api:${CORE_API_TAG:-develop}
     command: ["dotnet", "/app/gateway/Flit.Gateway.dll"]
     # content root = working_dir, para que YARP cargue sus rutas de appsettings.json
     working_dir: /app/gateway
@@ -104,7 +105,7 @@ services:
 
   # ── Frontend (React/Vite + nginx, solo estaticos) ─────────────────────────
   frontend:
-    image: ghcr.io/flitsas/abrahamc-dev/frontend:${FRONTEND_TAG:-latest}
+    image: ghcr.io/flitsas/${GHCR_NAMESPACE:-abrahamc-dev}/frontend:${FRONTEND_TAG:-develop}
     ports:
       - "127.0.0.1:${FRONTEND_PORT:-40105}:80"
     depends_on:
