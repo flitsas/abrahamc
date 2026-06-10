@@ -1,5 +1,5 @@
 # core-api Dockerfile — una sola imagen con Flit.Api y Flit.Gateway.
-# Build context: backend/dotnet/
+# Build context: services/core-api/
 #
 # Framework-dependent (NO AOT): QuestPDF en Flit.Modules.Receipts aun no es
 # AOT-compatible (ADR-0002). Cada servicio del compose elige su DLL via `command`:

@@ -18,7 +18,7 @@ services:
 
   core-api:
     build:
-      context: ../backend/dotnet
+      context: ../services/core-api
       dockerfile: Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: Development
