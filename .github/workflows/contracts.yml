@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
       - name: Lint core-api OpenAPI
         run: npx -y @redocly/cli@latest lint contracts/openapi/core-api.v1.yaml
       - name: Lint python-ml OpenAPI
@@ -29,6 +29,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
       - name: Validate events.v1.yaml
         run: npx -y @asyncapi/cli@latest validate contracts/asyncapi/events.v1.yaml
