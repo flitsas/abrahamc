@@ -3,13 +3,13 @@
 # Postgres NO esta aqui: corre en el HOST (host.docker.internal:5432).
 # El reverse-proxy del HOST termina TLS y enruta los dominios a los puertos
 # publicados en 127.0.0.1:
-#   jormanc.flitsas.online      -> frontend  (127.0.0.1:60106)
-#   api.jormanc.flitsas.online  -> gateway   (127.0.0.1:60206)  [API publica YARP]
-#   core.jormanc.flitsas.online -> core-api  (127.0.0.1:60306)  [Flit.Api interno/debug]
+#   abrahamc.flitsas.online      -> frontend  (127.0.0.1:60106)
+#   api.abrahamc.flitsas.online  -> gateway   (127.0.0.1:60206)  [API publica YARP]
+#   core.abrahamc.flitsas.online -> core-api  (127.0.0.1:60306)  [Flit.Api interno/debug]
 #
 # Variables requeridas en .env (junto al compose):
 #   CONNECTION_STRING_CORE  cadena Npgsql .NET (Host=...;Port=5432;Database=...;Username=...;Password=...)
-#   CORS_ORIGIN             origen permitido del frontend (https://jormanc.flitsas.online)
+#   CORS_ORIGIN             origen permitido del frontend (https://abrahamc.flitsas.online)
 #   VERIFIK_API_TOKEN       token Verifik (RUNT)
 # Variables para AISLAR este proyecto del resto del VPS (UNICAS por proyecto):
 #   COMPOSE_PROJECT_NAME    nombre del proyecto Compose (default: flit-prod)
