@@ -12,7 +12,7 @@ namespace Flit.Infrastructure.Persistence;
 public sealed class FlitDbContextFactory : IDesignTimeDbContextFactory<FlitDbContext>
 {
     private const string DefaultConnectionString =
-        "Host=localhost;Port=5432;Database=flit_dev;Username=postgres;Password=postgres";
+        "Host=localhost;Port=5433;Database=flit_dev;Username=flit;Password=flit_local";
 
     public FlitDbContext CreateDbContext(string[] args)
     {

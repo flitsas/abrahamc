@@ -6,6 +6,7 @@ using Serilog;
 using Flit.Api.Endpoints;
 using Flit.Api.Middleware;
 using Flit.Infrastructure;
+using Flit.Infrastructure.MultiTenant;
 using Flit.Infrastructure.Persistence;
 using Flit.Modules.Notifications;
 using Flit.Modules.Notifications.Ports;
@@ -39,9 +40,10 @@ builder.Services.AddFlitNotifications();
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddFlitPdf();
 
+var corsOrigins = (builder.Configuration["Cors:AllowedOrigins"] ?? "http://localhost:5173")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 builder.Services.AddCors(opts => opts.AddDefaultPolicy(p => p
-    .WithOrigins(
-        builder.Configuration["Cors:AllowedOrigins"] ?? "http://localhost:4001")
+    .WithOrigins(corsOrigins)
     .AllowAnyHeader()
     .AllowAnyMethod()
     .AllowCredentials()));
@@ -152,7 +154,11 @@ builder.Services.AddSingleton<Flit.Modules.ProceduresConfig.Adapters.InMemoryEnd
 
 if (!usePostgres)
 {
-    builder.Services.AddSingleton<ITenantContext, AmbientTenantContext>();
+    builder.Services.AddHttpContextAccessor();
+    builder.Services.AddScoped<Flit.Modules.Companies.Ports.ICompaniesSessionContext,
+        Flit.Api.Services.HttpCompaniesSessionContext>();
+    builder.Services.AddScoped<Flit.Infrastructure.MultiTenant.ITenantContext, TenantContext>();
+    builder.Services.AddSingleton<Flit.SharedKernel.ITenantContext, AmbientTenantContext>();
     builder.Services.AddSingleton<Flit.Modules.IdentityVerification.Application.IInvitationTokenHasher,
         Flit.Modules.IdentityVerification.Application.Sha256InvitationTokenHasher>();
     builder.Services.AddSingleton<Flit.Modules.IdentityVerification.Application.IInvitationTokenGenerator,

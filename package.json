@@ -6,20 +6,22 @@
   "packageManager": "pnpm@10.20.0",
   "scripts": {
     "preinstall": "npx only-allow pnpm",
-    "dev": "concurrently \"pnpm run dev:api\" \"pnpm --filter @flit/frontend dev\"",
+    "dev": "concurrently -k \"pnpm run dev:api\" \"pnpm run dev:frontend:wait\"",
+    "dev:frontend:wait": "wait-on -t 120000 http-get://localhost:3030/api/v1/health && pnpm --filter @flit/frontend dev",
     "dev:api": "dotnet watch run --project backend/dotnet/src/Flit.Api/Flit.Api.csproj",
     "dev:frontend": "pnpm --filter @flit/frontend dev",
     "build": "dotnet build backend/dotnet/Flit.slnx && pnpm --filter @flit/frontend build",
     "build:api": "dotnet build backend/dotnet/Flit.slnx",
-    "test": "dotnet test backend/dotnet/src/Flit.Api/Flit.Api.csproj && pnpm --filter @flit/frontend test",
-    "test:api": "dotnet test backend/dotnet/src/Flit.Api/Flit.Api.csproj",
+    "test": "dotnet test backend/dotnet/Flit.slnx && pnpm --filter @flit/frontend test",
+    "test:api": "dotnet test backend/dotnet/tests/Flit.Api.Tests/Flit.Api.Tests.csproj",
     "migrate": "dotnet ef database update --project backend/dotnet/src/Flit.Infrastructure/Flit.Infrastructure.csproj --startup-project backend/dotnet/src/Flit.Api/Flit.Api.csproj",
     "lint": "pnpm --filter @flit/frontend lint",
     "format:check": "pnpm --filter @flit/frontend format:check",
     "sync:agents": "./scripts/sync-agents.sh"
   },
   "devDependencies": {
-    "concurrently": "^9.0.1"
+    "concurrently": "^9.0.1",
+    "wait-on": "^8.0.3"
   },
   "engines": {
     "node": ">=24.0.0",

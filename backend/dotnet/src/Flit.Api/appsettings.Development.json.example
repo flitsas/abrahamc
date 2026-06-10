@@ -1,9 +1,9 @@
 {
   "ConnectionStrings": {
-    "Core": "Host=localhost;Port=5432;Database=flit_dev;Username=postgres;Password=postgres"
+    "Core": "Host=localhost;Port=5433;Database=flit_dev;Username=flit;Password=flit_local"
   },
   "Cors": {
-    "AllowedOrigins": "http://localhost:4001"
+    "AllowedOrigins": "http://localhost:5173,http://localhost:5174,http://localhost:5175"
   },
   "Jwt": {
     "DevGenerate": "true"
@@ -12,7 +12,7 @@
     "TramitesV2": true,
     "Onboarding": {
       "SigningKey": "flit-dev-onboarding-signing-key-change-in-production",
-      "ActivationBaseUrl": "http://localhost:4001"
+      "ActivationBaseUrl": "http://localhost:5173"
     }
   },
   "MinIO": {
@@ -21,19 +21,13 @@
     "AccessKey": "flit-core-app",
     "SecretKey": "flit_core_secret_32chars_min!!"
   },
-  "Identity": {
-    "TramitesV2": true,
-    "Onboarding": {
-      "SigningKey": "flit-dev-onboarding-signing-key-change-in-production",
-      "ActivationBaseUrl": "http://localhost:4001"
-    }
-  },
-    "Host": "smtp.office365.com",
+  "Smtp": {
+    "Host": "",
     "Port": 587,
     "UseStartTls": true,
     "DisableAuthentication": false,
-    "DefaultSenderEmail": "info@flitsas.com",
-    "DefaultSenderPassword": "<TU_PASSWORD_SMTP>",
+    "DefaultSenderEmail": "",
+    "DefaultSenderPassword": "",
     "DefaultSenderName": "FLIT Trámites"
   }
 }

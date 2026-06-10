@@ -16,4 +16,7 @@
     <Project Path="src/Flit.Modules.Integrations/Flit.Modules.Integrations.csproj" />
     <Project Path="src/Flit.Modules.Companies/Flit.Modules.Companies.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Flit.Api.Tests/Flit.Api.Tests.csproj" />
+  </Folder>
 </Solution>

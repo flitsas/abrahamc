@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -44,6 +44,8 @@
     "@playwright/test": "^1.47.1",
     "prettier": "^3.3.3",
     "eslint": "^9.9.0",
-    "@typescript-eslint/eslint-plugin": "^8.4.0"
+    "@typescript-eslint/eslint-plugin": "^8.4.0",
+    "@typescript-eslint/parser": "^8.4.0",
+    "@testing-library/jest-dom": "^6.5.0"
   }
 }

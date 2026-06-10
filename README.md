@@ -61,16 +61,17 @@ Solución **Flit.slnx** con arquitectura **Clean Architecture** modular:
 
 ### Frontend — SPA React (`frontend/`)
 
-Arquitectura **feature-sliced**. Estado actual:
+Arquitectura **feature-sliced** conectada a la API Trámites 2.0:
 
-| Ruta / feature | Descripción |
-|----------------|-------------|
-| `features/employees` | Página de empleados |
-| `features/employee-dependents` | Página de dependientes |
-| `features/employee-positions` | Página de cargos |
-| `features/personas` | Página de personas |
-| `shared/components/ui/DashboardLayout` | Layout con navegación lateral |
-| `shared/api/client.ts` | Cliente Axios con interceptors |
+| Ruta | Feature | Descripción |
+|------|---------|-------------|
+| `/login` | `features/auth` | Login con cookies de sesión (Zod + TanStack Query) |
+| `/` | `features/home` | Dashboard: sesión activa + health de la API |
+| `/tramites` | `features/procedures` | Listado de tipos de trámite del tenant |
+| — | `shared/components/ui` | `DashboardLayout`, `LoadingSkeleton`, `ErrorState`, `EmptyState` |
+| — | `shared/api/client.ts` | Cliente Axios (`withCredentials`) |
+
+**Tests:** Vitest (`src/**/*.test.ts`) + Playwright (`e2e/smoke.spec.ts`).
 
 ### Infraestructura (`infra/`)
 
@@ -106,6 +107,7 @@ Arquitectura **feature-sliced**. Estado actual:
 │   │   │   ├── Flit.Gateway/
 │   │   │   ├── Flit.SharedKernel/
 │   │   │   └── Flit.Modules.*/    # Módulos de dominio
+│   │   ├── tests/Flit.Api.Tests/  # xUnit (handlers + dominio)
 │   │   ├── Flit.slnx
 │   │   ├── global.json
 │   │   └── Dockerfile
@@ -152,7 +154,18 @@ dotnet restore backend/dotnet/Flit.slnx
 **Opción A — Docker (recomendado):**
 
 ```bash
+# Primera vez o tras cambiar puerto/credenciales: recrear contenedor + volumen
+docker compose -f infra/docker-compose.yml down -v
 docker compose -f infra/docker-compose.yml up postgres -d
+```
+
+El contenedor expone PostgreSQL en el puerto **5433** del host (no 5432) para evitar conflictos con una instalación local de PostgreSQL en Windows.
+
+Comprueba que el mapeo sea `5433->5432` antes de migrar:
+
+```bash
+docker compose -f infra/docker-compose.yml ps
+# Debe mostrar: 0.0.0.0:5433->5432/tcp
 ```
 
 **Opción B — PostgreSQL local:**
@@ -173,20 +186,31 @@ Crear base de datos con:
 pnpm run migrate
 ```
 
+**Si `pnpm run migrate` falla con `28P01` (autenticación):**
+
+1. Verifica que no tengas `ConnectionStrings__Core` definida en el sistema con credenciales distintas (`Get-ChildItem Env:ConnectionStrings__Core` en PowerShell).
+2. Reinicia el contenedor con volumen limpio:
+
+```bash
+docker compose -f infra/docker-compose.yml down -v
+docker compose -f infra/docker-compose.yml up postgres -d
+pnpm run migrate
+```
+
 ### 3. Configurar variables de entorno
 
 **Backend** — editar `backend/dotnet/src/Flit.Api/appsettings.Development.json`:
 
 | Clave | Descripción | Valor DEV |
 |-------|-------------|-----------|
-| `ConnectionStrings:Core` | Cadena PostgreSQL | `Host=localhost;Port=5432;Database=flit_dev;Username=flit;Password=flit_local` |
+| `ConnectionStrings:Core` | Cadena PostgreSQL (Docker) | `Host=localhost;Port=5433;Database=flit_dev;Username=flit;Password=flit_local` |
 | `Cors:AllowedOrigins` | Origen del frontend | `http://localhost:5173` |
 
 También puedes sobreescribir con variables de entorno:
 
 ```bash
 # PowerShell
-$env:ConnectionStrings__Core = "Host=localhost;Port=5432;Database=flit_dev;Username=flit;Password=flit_local"
+$env:ConnectionStrings__Core = "Host=localhost;Port=5433;Database=flit_dev;Username=flit;Password=flit_local"
 $env:Cors__AllowedOrigins = "http://localhost:5173"
 ```
 
@@ -200,11 +224,14 @@ cp frontend/.env.example frontend/.env.local
 Copy-Item frontend\.env.example frontend\.env.local
 ```
 
-Contenido de `frontend/.env.local`:
+Contenido de `frontend/.env.local` (o `frontend/.env`):
 
 ```
-VITE_API_BASE_URL=http://localhost:3030/api/v1
+# Ruta relativa: Vite hace proxy de /api → http://localhost:3030
+VITE_API_BASE_URL=/api/v1
 ```
+
+> Si el login muestra error de conexión, confirma que el backend esté en marcha (`pnpm run dev:api` o `pnpm run dev`) y que Postgres esté activo en el puerto **5433**.
 
 ### 4. Levantar el backend (.NET)
 
@@ -252,15 +279,33 @@ pnpm dev
 
 El frontend queda en **http://localhost:5173**. Vite hace proxy de `/api` hacia `http://localhost:3030`.
 
+**Credenciales DEV** (tras `pnpm run migrate` y seed `AddTramites20DevFunctionalSeed`):
+
+| Usuario | Contraseña |
+|---------|------------|
+| `superadmin@flit.com.co` | `FlitDev2026!` |
+| `operador1@transportes-andina.com` | `FlitDev2026!` |
+
 ### 6. Levantar backend + frontend juntos
 
 ```bash
 pnpm run dev
 ```
 
-Inicia en paralelo:
-- `pnpm run dev:api` → API .NET con hot reload
-- `pnpm run dev:frontend` → Vite dev server
+Inicia en este orden:
+1. `pnpm run dev:api` → API .NET con hot reload (puerto **3030**)
+2. Espera a que responda `http://localhost:3030/api/v1/health`
+3. `pnpm run dev:frontend` → Vite dev server (puerto **5173**)
+
+**Si Vite dice que el puerto 5173 está ocupado**, cierra la instancia anterior:
+
+```powershell
+# PowerShell — ver qué proceso usa el puerto
+Get-NetTCPConnection -LocalPort 5173 -ErrorAction SilentlyContinue | Select-Object OwningProcess
+Stop-Process -Id <PID> -Force
+```
+
+**Si la API no arranca en 3030**, repite el mismo procedimiento con el puerto `3030`.
 
 ### 7. Stack completo con Docker
 
@@ -272,7 +317,7 @@ docker compose -f infra/docker-compose.yml up --build
 
 | Servicio | Puerto host | Descripción |
 |----------|-------------|-------------|
-| PostgreSQL | 5432 | Base de datos |
+| PostgreSQL | 5433 | Base de datos (host; interno 5432) |
 | core-api | 3030 | API .NET (interno 8081) |
 | frontend | 5173 | SPA servida por nginx (interno 80) |
 
@@ -300,7 +345,7 @@ Variables requeridas en `.env`:
 | Frontend (Vite) | http://localhost:5173 |
 | API (`Flit.Api`) | http://localhost:3030 |
 | Health check | http://localhost:3030/api/v1/health |
-| PostgreSQL | localhost:5432 |
+| PostgreSQL (Docker) | localhost:5433 |
 | Python ML (opcional) | http://localhost:4012/health |
 
 ---
