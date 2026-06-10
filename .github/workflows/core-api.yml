@@ -3,10 +3,10 @@ name: Core API (.NET 10)
 on:
   push:
     branches: [develop, main]
-    paths: ['services/core-api/**', 'contracts/openapi/core-api.v1.yaml']
+    paths: ['backend/dotnet/**', 'contracts/openapi/core-api.v1.yaml']
   pull_request:
     branches: [develop]
-    paths: ['services/core-api/**', 'contracts/openapi/core-api.v1.yaml']
+    paths: ['backend/dotnet/**', 'contracts/openapi/core-api.v1.yaml']
 
 jobs:
   build-test:
@@ -18,18 +18,18 @@ jobs:
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
-          global-json-file: services/core-api/global.json
+          global-json-file: backend/dotnet/global.json
 
       - name: Restore
-        working-directory: services/core-api
+        working-directory: backend/dotnet
         run: dotnet restore
 
       - name: Build
-        working-directory: services/core-api
+        working-directory: backend/dotnet
         run: dotnet build --no-restore --configuration Release
 
       - name: Test
-        working-directory: services/core-api
+        working-directory: backend/dotnet
         run: dotnet test --no-build --configuration Release --logger "trx" --collect "XPlat Code Coverage"
 
       - name: Upload test results
@@ -37,7 +37,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: core-api-test-results
-          path: services/core-api/tests/**/TestResults/
+          path: backend/dotnet/tests/**/TestResults/
 
   aot-publish:
     runs-on: ubuntu-latest
@@ -48,12 +48,12 @@ jobs:
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
-          global-json-file: services/core-api/global.json
+          global-json-file: backend/dotnet/global.json
 
       # MVP Fase 11: JIT escape documentado (ADR-0002 §"AOT en .NET").
       # QuestPDF (Flit.Modules.Recibos) usa reflection + SkiaSharp y
       # aun no es AOT-compatible. Cuando lo sea (roadmap 2025) o se cambie
       # de motor PDF, volver a --self-contained con AOT.
       - name: Publish (linux-musl-x64, JIT)
-        working-directory: services/core-api
+        working-directory: backend/dotnet
         run: dotnet publish src/Flit.Api/Flit.Api.csproj -c Release -r linux-musl-x64 --self-contained -o publish /p:PublishAot=false

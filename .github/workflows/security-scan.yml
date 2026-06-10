@@ -25,10 +25,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Backend audit
-        run: pnpm --filter @flit/backend audit --prod --audit-level high
-
-      - name: Frontend audit
+      - name: Audit frontend dependencies
         run: pnpm --filter @flit/frontend audit --prod --audit-level high
 
   secret-scan:
