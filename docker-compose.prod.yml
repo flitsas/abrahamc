@@ -3,9 +3,9 @@
 # Postgres NO esta aqui: corre en el HOST (host.docker.internal:5432).
 # El reverse-proxy del HOST termina TLS y enruta los dominios a los puertos
 # publicados en 127.0.0.1:
-#   dev.abrahamc.flitsas.online     -> frontend  (127.0.0.1:40105)
-#   api.dev.abrahamc.flitsas.online -> gateway   (127.0.0.1:40205)  [API publica YARP]
-#   core.dev.abrahamc.flitsas.online -> core-api (127.0.0.1:40305)  [Flit.Api interno/debug]
+#   dev.abrahamc.flitsas.online      -> frontend  (127.0.0.1:40105)
+#   dev.api.abrahamc.flitsas.online   -> gateway   (127.0.0.1:40205)  [API publica YARP]
+#   dev.core.abrahamc.flitsas.online  -> core-api (127.0.0.1:40305)  [Flit.Api interno/debug]
 #
 # Variables requeridas en .env (junto al compose):
 #   CONNECTION_STRING_CORE  cadena Npgsql .NET (Host=...;Port=5432;Database=...;Username=...;Password=...)

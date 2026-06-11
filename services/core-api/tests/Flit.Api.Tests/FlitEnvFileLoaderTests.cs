@@ -23,4 +23,27 @@ public sealed class FlitEnvFileLoaderTests
         Assert.Equal(expectedKey, parsed.Value.Key);
         Assert.Equal(expectedValue, parsed.Value.Value);
     }
+
+    [Fact]
+    public void FindEnvFile_prefers_env_local_over_env()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "flit-env-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        File.WriteAllText(Path.Combine(root, "package.json"), "{}");
+        File.WriteAllText(Path.Combine(root, "env"), "CONNECTION_STRING_CORE=from-env");
+        File.WriteAllText(Path.Combine(root, "env.local"), "CONNECTION_STRING_CORE=from-local");
+
+        var previousCwd = Directory.GetCurrentDirectory();
+        try
+        {
+            Directory.SetCurrentDirectory(root);
+            var found = FlitEnvFileLoader.FindEnvFile();
+            Assert.Equal(Path.Combine(root, "env.local"), found);
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(previousCwd);
+            Directory.Delete(root, recursive: true);
+        }
+    }
 }

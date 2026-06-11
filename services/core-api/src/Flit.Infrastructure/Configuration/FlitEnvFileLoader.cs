@@ -1,8 +1,9 @@
 namespace Flit.Infrastructure.Configuration;
 
 /// <summary>
-/// Carga el archivo <c>env</c> en la raíz del monorepo hacia variables de entorno
-/// antes de que ASP.NET Core construya <see cref="Microsoft.Extensions.Configuration.IConfiguration"/>.
+/// Carga <c>env.local</c> (desarrollo en máquina) o, si no existe, <c>env</c> en la raíz del monorepo
+/// hacia variables de entorno antes de que ASP.NET Core construya
+/// <see cref="Microsoft.Extensions.Configuration.IConfiguration"/>.
 /// No sobrescribe variables ya definidas (Docker, CI, shell).
 /// </summary>
 public static class FlitEnvFileLoader
@@ -46,12 +47,22 @@ public static class FlitEnvFileLoader
         var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
         while (dir is not null)
         {
-            var envPath = Path.Combine(dir.FullName, "env");
             var packageJson = Path.Combine(dir.FullName, "package.json");
-            if (File.Exists(envPath) && File.Exists(packageJson))
+            if (!File.Exists(packageJson))
+            {
+                dir = dir.Parent;
+                continue;
+            }
+
+            var envLocalPath = Path.Combine(dir.FullName, "env.local");
+            if (File.Exists(envLocalPath))
+                return envLocalPath;
+
+            var envPath = Path.Combine(dir.FullName, "env");
+            if (File.Exists(envPath))
                 return envPath;
 
-            dir = dir.Parent;
+            return null;
         }
 
         return null;
