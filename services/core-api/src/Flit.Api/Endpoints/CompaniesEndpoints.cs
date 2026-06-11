@@ -674,8 +674,8 @@ public static class CompaniesEndpoints
                     page ?? 1,
                     pageSize ?? limit ?? 20,
                     companyId,
-                    nit: unifiedSearch,
-                    name: null,
+                    unifiedSearch,
+                    null,
                     createdFrom,
                     createdTo),
                 repo,
@@ -709,7 +709,11 @@ public static class CompaniesEndpoints
                     session.IsSuperAdmin),
                 tenantProvisioner,
                 companiesRepo,
-                ct => uow.SaveChangesAsync(ct),
+                async ct =>
+                {
+                    await uow.SaveChangesAsync(ct);
+                    return 0;
+                },
                 clock,
                 ct);
 

@@ -1,6 +1,7 @@
 using Flit.Api.Auth;
 using Flit.Modules.Companies.Application;
 using Flit.Modules.Companies.Ports;
+using Flit.Modules.Users.Application;
 using Flit.SharedKernel;
 
 namespace Flit.Api.Endpoints;
