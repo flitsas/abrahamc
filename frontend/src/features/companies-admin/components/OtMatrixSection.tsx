@@ -12,6 +12,7 @@ import { LoadingSkeleton } from "../../../shared/components/ui/LoadingSkeleton.j
 
 type OtMatrixSectionProps = {
   tenantId: string;
+  embedded?: boolean;
   onDirtyChange: (dirty: boolean) => void;
 };
 
@@ -25,6 +26,7 @@ type OtMatrixRow = {
 
 export function OtMatrixSection({
   tenantId,
+  embedded = false,
   onDirtyChange,
 }: OtMatrixSectionProps) {
   const canEdit = useCanEditCompanyConfig();
@@ -158,14 +160,16 @@ export function OtMatrixSection({
 
   return (
     <form className="space-y-4" onSubmit={handleSave}>
-      <div>
-        <h3 className="text-base font-semibold text-flit-blueDark">
-          Matriz OT autorizados
-        </h3>
-        <p className="mt-1 text-sm text-flit-muted">
-          Habilita los organismos de tránsito permitidos para este tenant.
-        </p>
-      </div>
+      {!embedded && (
+        <div>
+          <h3 className="text-base font-semibold text-flit-blueDark">
+            Matriz OT autorizados
+          </h3>
+          <p className="mt-1 text-sm text-flit-muted">
+            Habilita los organismos de tránsito permitidos para este tenant.
+          </p>
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-[10px] border border-flit-draft/20">
         <table className="min-w-full text-sm">

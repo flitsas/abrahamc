@@ -12,6 +12,7 @@ import { LoadingSkeleton } from "../../../shared/components/ui/LoadingSkeleton.j
 
 type VehicleExceptionsSectionProps = {
   tenantId: string;
+  embedded?: boolean;
 };
 
 function shortUserId(userId: string): string {
@@ -20,6 +21,7 @@ function shortUserId(userId: string): string {
 
 export function VehicleExceptionsSection({
   tenantId,
+  embedded = false,
 }: VehicleExceptionsSectionProps) {
   const canEdit = useCanEditCompanyConfig();
   const exceptionsQuery = useVehicleExceptions(tenantId);
@@ -83,18 +85,24 @@ export function VehicleExceptionsSection({
   }
 
   return (
-    <section className="space-y-4" aria-labelledby="vehicle-exceptions-heading">
-      <div>
-        <h3
-          id="vehicle-exceptions-heading"
-          className="text-base font-semibold text-flit-blueDark"
-        >
-          Excepciones vehiculares
-        </h3>
-        <p className="mt-1 text-sm text-flit-muted">
-          Lista blanca de usuarios autorizados para operar vehículos de terceros.
-        </p>
-      </div>
+    <section
+      className="space-y-4"
+      aria-label={embedded ? "Excepciones vehiculares" : undefined}
+      aria-labelledby={embedded ? undefined : "vehicle-exceptions-heading"}
+    >
+      {!embedded && (
+        <div>
+          <h3
+            id="vehicle-exceptions-heading"
+            className="text-base font-semibold text-flit-blueDark"
+          >
+            Excepciones vehiculares
+          </h3>
+          <p className="mt-1 text-sm text-flit-muted">
+            Lista blanca de usuarios autorizados para operar vehículos de terceros.
+          </p>
+        </div>
+      )}
 
       {canEdit && (
         <form

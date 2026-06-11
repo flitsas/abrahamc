@@ -1,6 +1,14 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import type { CompanyRow } from "../api/companies.schemas.js";
 import { COMPANY_MODULE_KEYS } from "../api/companies.schemas.js";
+import {
+  buildEmpresaSubNavItems,
+  type EmpresaSubTabId,
+} from "../lib/empresaSubNav.js";
+import { useCanEditCompanyConfig } from "../hooks/useCanEditCompanyConfig.js";
+import { GradientButton } from "../../../shared/components/flit/GradientButton.js";
+import { CompanyConfigSubNav } from "./CompanyConfigSubNav.js";
+import { EditCompanyDialog } from "./EditCompanyDialog.js";
 import { ModuleConfigForm } from "./ModuleConfigForm.js";
 import { OtMatrixSection } from "./OtMatrixSection.js";
 import { VehicleExceptionsSection } from "./VehicleExceptionsSection.js";
@@ -16,16 +24,39 @@ const TABS: { id: ConfigTabId; label: string }[] = [
 
 type CompanyConfigTabsProps = {
   company: CompanyRow;
+  onCompanyUpdated?: () => void;
 };
 
-export function CompanyConfigTabs({ company }: CompanyConfigTabsProps) {
+export function CompanyConfigTabs({
+  company,
+  onCompanyUpdated,
+}: CompanyConfigTabsProps) {
+  const canEdit = useCanEditCompanyConfig();
   const tabsId = useId();
+  const [editOpen, setEditOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ConfigTabId>("matricula");
   const [dirtyTabs, setDirtyTabs] = useState<Partial<Record<ConfigTabId, boolean>>>(
     {},
   );
-  const [empresaModuleDirty, setEmpresaModuleDirty] = useState(false);
+  const [activeEmpresaSubTab, setActiveEmpresaSubTab] =
+    useState<EmpresaSubTabId>("general");
+  const [empresaGeneralDirty, setEmpresaGeneralDirty] = useState(false);
   const [empresaOtDirty, setEmpresaOtDirty] = useState(false);
+
+  const empresaSubNavItems = useMemo(
+    () =>
+      buildEmpresaSubNavItems({
+        general: empresaGeneralDirty,
+        "matriz-ot": empresaOtDirty,
+      }),
+    [empresaGeneralDirty, empresaOtDirty],
+  );
+
+  useEffect(() => {
+    setActiveEmpresaSubTab("general");
+    setEmpresaGeneralDirty(false);
+    setEmpresaOtDirty(false);
+  }, [company.tenantId]);
 
   const setTabDirty = useCallback((tabId: ConfigTabId, dirty: boolean) => {
     setDirtyTabs((current) => {
@@ -38,13 +69,51 @@ export function CompanyConfigTabs({ company }: CompanyConfigTabsProps) {
 
   useEffect(() => {
     setDirtyTabs((current) => {
-      const combined = empresaModuleDirty || empresaOtDirty;
+      const combined = empresaGeneralDirty || empresaOtDirty;
       if (current.empresa === combined) {
         return current;
       }
       return { ...current, empresa: combined };
     });
-  }, [empresaModuleDirty, empresaOtDirty]);
+  }, [empresaGeneralDirty, empresaOtDirty]);
+
+  function isEmpresaSubTabDirty(subTab: EmpresaSubTabId): boolean {
+    if (subTab === "general") {
+      return empresaGeneralDirty;
+    }
+    if (subTab === "matriz-ot") {
+      return empresaOtDirty;
+    }
+    return false;
+  }
+
+  function clearEmpresaSubTabDirty(subTab: EmpresaSubTabId) {
+    if (subTab === "general") {
+      setEmpresaGeneralDirty(false);
+      return;
+    }
+    if (subTab === "matriz-ot") {
+      setEmpresaOtDirty(false);
+    }
+  }
+
+  function requestEmpresaSubTabChange(nextSubTab: EmpresaSubTabId) {
+    if (nextSubTab === activeEmpresaSubTab) {
+      return;
+    }
+
+    if (isEmpresaSubTabDirty(activeEmpresaSubTab)) {
+      const confirmed = window.confirm(
+        "Hay cambios sin guardar en este submódulo. ¿Desea cambiar sin guardar?",
+      );
+      if (!confirmed) {
+        return;
+      }
+      clearEmpresaSubTabDirty(activeEmpresaSubTab);
+    }
+
+    setActiveEmpresaSubTab(nextSubTab);
+  }
 
   function requestTabChange(nextTab: ConfigTabId) {
     if (nextTab === activeTab) {
@@ -60,7 +129,7 @@ export function CompanyConfigTabs({ company }: CompanyConfigTabsProps) {
       }
       setDirtyTabs((current) => ({ ...current, [activeTab]: false }));
       if (activeTab === "empresa") {
-        setEmpresaModuleDirty(false);
+        setEmpresaGeneralDirty(false);
         setEmpresaOtDirty(false);
       }
     }
@@ -73,16 +142,27 @@ export function CompanyConfigTabs({ company }: CompanyConfigTabsProps) {
       className="rounded-flit-card border border-flit-draft/20 bg-flit-card p-6 shadow-flit-card"
       aria-labelledby={`${tabsId}-heading`}
     >
-      <header className="mb-6">
-        <h2
-          id={`${tabsId}-heading`}
-          className="text-lg font-bold text-flit-blueDark"
-        >
-          Configuración — {company.legalName}
-        </h2>
-        <p className="mt-1 text-sm text-flit-muted">
-          NIT {company.nit} · Tenant {company.tenantName}
-        </p>
+      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2
+            id={`${tabsId}-heading`}
+            className="text-lg font-bold text-flit-blueDark"
+          >
+            Configuración — {company.legalName}
+          </h2>
+          <p className="mt-1 text-sm text-flit-muted">
+            NIT {company.nit} · Tenant {company.tenantName}
+          </p>
+        </div>
+        {canEdit && (
+          <GradientButton
+            type="button"
+            className="!h-12 !w-auto shrink-0 !px-8 !text-sm"
+            onClick={() => setEditOpen(true)}
+          >
+            Editar datos
+          </GradientButton>
+        )}
       </header>
 
       <div
@@ -152,21 +232,42 @@ export function CompanyConfigTabs({ company }: CompanyConfigTabsProps) {
             role="tabpanel"
             id={`${tabsId}-panel-empresa`}
             aria-labelledby={`${tabsId}-tab-empresa`}
-            className="space-y-8"
+            className="space-y-6"
           >
-            <ModuleConfigForm
-              tenantId={company.tenantId}
-              moduleKey={COMPANY_MODULE_KEYS.company}
-              label="Configuración general de empresa"
-              onDirtyChange={setEmpresaModuleDirty}
+            <CompanyConfigSubNav
+              idPrefix={tabsId}
+              ariaLabel="Submódulos de empresa"
+              items={empresaSubNavItems}
+              activeId={activeEmpresaSubTab}
+              onChange={(subTabId) =>
+                requestEmpresaSubTabChange(subTabId as EmpresaSubTabId)
+              }
             />
-            <hr className="border-flit-draft/15" />
-            <OtMatrixSection
-              tenantId={company.tenantId}
-              onDirtyChange={setEmpresaOtDirty}
-            />
-            <hr className="border-flit-draft/15" />
-            <VehicleExceptionsSection tenantId={company.tenantId} />
+
+            {activeEmpresaSubTab === "general" && (
+              <ModuleConfigForm
+                tenantId={company.tenantId}
+                moduleKey={COMPANY_MODULE_KEYS.company}
+                label="Configuración general de empresa"
+                embedded
+                onDirtyChange={setEmpresaGeneralDirty}
+              />
+            )}
+
+            {activeEmpresaSubTab === "matriz-ot" && (
+              <OtMatrixSection
+                tenantId={company.tenantId}
+                embedded
+                onDirtyChange={setEmpresaOtDirty}
+              />
+            )}
+
+            {activeEmpresaSubTab === "excepciones" && (
+              <VehicleExceptionsSection
+                tenantId={company.tenantId}
+                embedded
+              />
+            )}
           </div>
         )}
 
@@ -185,6 +286,13 @@ export function CompanyConfigTabs({ company }: CompanyConfigTabsProps) {
           </div>
         )}
       </div>
+
+      <EditCompanyDialog
+        open={editOpen}
+        company={company}
+        onClose={() => setEditOpen(false)}
+        onSuccess={() => onCompanyUpdated?.()}
+      />
     </section>
   );
 }

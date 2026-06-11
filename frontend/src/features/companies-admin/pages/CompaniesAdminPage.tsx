@@ -1,25 +1,49 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { PERMISSIONS } from "../../auth/lib/permissions.js";
+import { usePermission } from "../../auth/hooks/usePermission.js";
 import { useCompaniesList } from "../api/companies.api.js";
 import type { CompanyRow } from "../api/companies.schemas.js";
 import { CompanyConfigTabs } from "../components/CompanyConfigTabs.js";
 import { CompanyGrid } from "../components/CompanyGrid.js";
+import { CreateCompanyDialog } from "../components/CreateCompanyDialog.js";
 import { useDebouncedValue } from "../hooks/useDebouncedValue.js";
+import { GradientButton } from "../../../shared/components/flit/GradientButton.js";
 import { PageHeaderCard } from "../../../shared/components/flit/PageHeaderCard.js";
 
 const PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 300;
 
 export function CompaniesAdminPage() {
+  const canManageCompanies = usePermission(PERMISSIONS.manageCompanies);
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDebouncedValue(searchInput.trim(), SEARCH_DEBOUNCE_MS);
   const [selectedCompany, setSelectedCompany] = useState<CompanyRow | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const companiesQuery = useCompaniesList({
     page,
     pageSize: PAGE_SIZE,
     search: debouncedSearch || undefined,
   });
+
+  useEffect(() => {
+    if (!selectedCompany || !companiesQuery.data?.data) {
+      return;
+    }
+    const refreshed = companiesQuery.data.data.find(
+      (row) => row.id === selectedCompany.id,
+    );
+    if (
+      refreshed &&
+      (refreshed.legalName !== selectedCompany.legalName ||
+        refreshed.commercialName !== selectedCompany.commercialName ||
+        refreshed.updatedAt !== selectedCompany.updatedAt)
+    ) {
+      setSelectedCompany(refreshed);
+    }
+  }, [companiesQuery.data, selectedCompany]);
 
   function handleSearchChange(value: string) {
     setSearchInput(value);
@@ -37,7 +61,27 @@ export function CompaniesAdminPage() {
       <PageHeaderCard
         title="Compañías B2B"
         subtitle="Indexación y configuración de módulos por tenant para operación SuperAdmin."
+        actions={
+          canManageCompanies ? (
+            <GradientButton
+              type="button"
+              className="!h-12 !w-auto !px-8 !text-sm"
+              onClick={() => setCreateOpen(true)}
+            >
+              Nueva compañía
+            </GradientButton>
+          ) : undefined
+        }
       />
+
+      {statusMessage && (
+        <div
+          className="rounded-[10px] border border-flit-green/30 bg-flit-green/10 px-4 py-3 text-sm text-flit-green"
+          role="status"
+        >
+          {statusMessage}
+        </div>
+      )}
 
       <div>
         <label
@@ -73,7 +117,21 @@ export function CompaniesAdminPage() {
         onRetry={() => companiesQuery.refetch()}
       />
 
-      {selectedCompany && <CompanyConfigTabs company={selectedCompany} />}
+      {selectedCompany && (
+        <CompanyConfigTabs
+          company={selectedCompany}
+          onCompanyUpdated={() => companiesQuery.refetch()}
+        />
+      )}
+
+      <CreateCompanyDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSuccess={(legalName) => {
+          setStatusMessage(`Compañía «${legalName}» creada correctamente.`);
+          setPage(1);
+        }}
+      />
     </div>
   );
 }

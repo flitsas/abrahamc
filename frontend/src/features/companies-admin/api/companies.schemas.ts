@@ -84,6 +84,37 @@ export const upsertModuleConfigRequestSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
+export const createCompanyRequestSchema = z.object({
+  nit: z.string().min(1, "El NIT es obligatorio."),
+  legalName: z.string().min(1, "La razón social es obligatoria."),
+  commercialName: z.string().optional(),
+  contactEmail: z.string().optional(),
+  slug: z.string().optional(),
+  modulesEnabledJson: z.string().optional(),
+});
+
+export const createCompanyResponseSchema = z.object({
+  id: z.string().uuid(),
+  tenantId: z.string().uuid(),
+  nit: z.string(),
+  legalName: z.string(),
+  commercialName: z.string().nullish(),
+  status: z.string(),
+  modulesEnabledJson: z.string(),
+  createdAt: z.string(),
+});
+
+export const updateCompanyRequestSchema = z.object({
+  legalName: z.string().min(1, "La razón social es obligatoria."),
+  commercialName: z.string().optional(),
+  modulesEnabledJson: z.string().optional(),
+});
+
+export const updateCompanyResponseSchema = z.object({
+  id: z.string().uuid(),
+  updatedAt: z.string(),
+});
+
 export const createVehicleExceptionRequestSchema = z.object({
   userId: z.string().uuid(),
   reason: z.string().optional(),
@@ -106,6 +137,10 @@ export type OtAgency = z.infer<typeof otAgencySchema>;
 export type UpsertModuleConfigRequest = z.infer<
   typeof upsertModuleConfigRequestSchema
 >;
+export type CreateCompanyRequest = z.infer<typeof createCompanyRequestSchema>;
+export type CreateCompanyResponse = z.infer<typeof createCompanyResponseSchema>;
+export type UpdateCompanyRequest = z.infer<typeof updateCompanyRequestSchema>;
+export type UpdateCompanyResponse = z.infer<typeof updateCompanyResponseSchema>;
 export type CreateVehicleExceptionRequest = z.infer<
   typeof createVehicleExceptionRequestSchema
 >;

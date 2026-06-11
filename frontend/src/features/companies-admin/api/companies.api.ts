@@ -4,6 +4,10 @@ import { queryKeys } from "../../../shared/lib/queryKeys.js";
 import {
   authorizedTrafficAgenciesSchema,
   companiesPageSchema,
+  createCompanyRequestSchema,
+  createCompanyResponseSchema,
+  updateCompanyRequestSchema,
+  updateCompanyResponseSchema,
   createVehicleExceptionRequestSchema,
   moduleConfigSchema,
   otAgenciesPageSchema,
@@ -11,6 +15,8 @@ import {
   upsertModuleConfigResponseSchema,
   vehicleExceptionsSchema,
   type CompanyModuleKey,
+  type CreateCompanyRequest,
+  type UpdateCompanyRequest,
   type CreateVehicleExceptionRequest,
   type UpsertModuleConfigRequest,
 } from "./companies.schemas.js";
@@ -20,6 +26,42 @@ type ListCompaniesParams = {
   pageSize: number;
   search?: string;
 };
+
+export async function createCompany(payload: CreateCompanyRequest) {
+  const body = createCompanyRequestSchema.parse({
+    ...payload,
+    commercialName: payload.commercialName?.trim() || undefined,
+    contactEmail: payload.contactEmail?.trim() || undefined,
+    slug: payload.slug?.trim() || undefined,
+    modulesEnabledJson: payload.modulesEnabledJson?.trim() || undefined,
+  });
+  const { data } = await apiClient.post("/companies", {
+    nit: body.nit.trim(),
+    legalName: body.legalName.trim(),
+    commercialName: body.commercialName ?? null,
+    contactEmail: body.contactEmail ?? null,
+    slug: body.slug ?? null,
+    modulesEnabledJson: body.modulesEnabledJson ?? null,
+  });
+  return createCompanyResponseSchema.parse(data);
+}
+
+export async function updateCompany(
+  companyId: string,
+  payload: UpdateCompanyRequest,
+) {
+  const body = updateCompanyRequestSchema.parse({
+    ...payload,
+    commercialName: payload.commercialName?.trim() || undefined,
+    modulesEnabledJson: payload.modulesEnabledJson?.trim() || undefined,
+  });
+  const { data } = await apiClient.patch(`/companies/${companyId}`, {
+    legalName: body.legalName.trim(),
+    commercialName: body.commercialName ?? null,
+    modulesEnabledJson: body.modulesEnabledJson ?? null,
+  });
+  return updateCompanyResponseSchema.parse(data);
+}
 
 export async function fetchCompanies(params: ListCompaniesParams) {
   const { data } = await apiClient.get("/companies", {
@@ -114,6 +156,33 @@ export async function fetchOtAgencies(pageSize = 100) {
     params: { page: 1, pageSize },
   });
   return otAgenciesPageSchema.parse(data);
+}
+
+export function useCreateCompany() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: createCompany,
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["companies-admin", "list"],
+      });
+    },
+  });
+}
+
+export function useUpdateCompany(companyId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: UpdateCompanyRequest) =>
+      updateCompany(companyId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["companies-admin", "list"],
+      });
+    },
+  });
 }
 
 export function useCompaniesList(
