@@ -5,6 +5,7 @@ import { PERMISSIONS } from "../features/auth/lib/permissions.js";
 import { usePermission } from "../features/auth/hooks/usePermission.js";
 import { HomePage } from "../features/home/pages/HomePage.js";
 import { UsersAdminPage } from "../features/identity-admin/pages/UsersAdminPage.js";
+import { CompaniesAdminPage } from "../features/companies-admin/pages/CompaniesAdminPage.js";
 import { ProceduresPage } from "../features/procedures/pages/ProceduresPage.js";
 import { AppShell } from "../shared/components/flit/AppShell.js";
 
@@ -82,9 +83,38 @@ const USERS_NAV_ITEM: NavItem = {
   ),
 };
 
+const COMPANIES_NAV_ITEM: NavItem = {
+  id: "companies",
+  to: "/admin/companies",
+  label: "Compañías",
+  icon: (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6" />
+    </svg>
+  ),
+};
+
 function useAppNavItems(): NavItem[] {
   const canManageUsers = usePermission(PERMISSIONS.manageUsers);
-  return canManageUsers ? [...BASE_NAV_ITEMS, USERS_NAV_ITEM] : BASE_NAV_ITEMS;
+  const canViewCompanies = usePermission(PERMISSIONS.viewCompanies);
+  const items = [...BASE_NAV_ITEMS];
+  if (canManageUsers) {
+    items.push(USERS_NAV_ITEM);
+  }
+  if (canViewCompanies) {
+    items.push(COMPANIES_NAV_ITEM);
+  }
+  return items;
 }
 
 type AppLayoutProps = {
@@ -101,6 +131,8 @@ export function AppLayout({ previewPath }: AppLayoutProps) {
           <ProceduresPage />
         ) : previewPath === "/admin/usuarios" ? (
           <UsersAdminPage />
+        ) : previewPath === "/admin/companies" ? (
+          <CompaniesAdminPage />
         ) : (
           <HomePage />
         )}
@@ -118,6 +150,14 @@ export function AppLayout({ previewPath }: AppLayoutProps) {
           element={
             <RequirePermissionRoute permission={PERMISSIONS.manageUsers}>
               <UsersAdminPage />
+            </RequirePermissionRoute>
+          }
+        />
+        <Route
+          path="/admin/companies"
+          element={
+            <RequirePermissionRoute permission={PERMISSIONS.viewCompanies}>
+              <CompaniesAdminPage />
             </RequirePermissionRoute>
           }
         />
