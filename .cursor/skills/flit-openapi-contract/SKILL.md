@@ -25,7 +25,9 @@ Garantizar que **toda HU con endpoints REST** deje trazabilidad en:
 
 1. Leer `services/core-api/src/Flit.Api/Program.cs` — debe existir:
    - `builder.Services.AddOpenApi("v1", ...)`
+   - `FlitOpenApiSecurityTransformers.Configure(options)` (bearerAuth + sessionCookie)
    - `app.MapOpenApi()`
+   - `app.UseSwaggerUI` con `PersistAuthorization = true`
 2. Leer `docs/openapi.yaml` vigente
 3. Identificar archivo `*Endpoints.cs` de la HU
 
@@ -56,6 +58,13 @@ curl -s http://localhost:3030/openapi/v1.json | head
 ```
 
 Local: `http://localhost:3030/swagger` (Swagger UI) · spec JSON: `/openapi/v1.json`
+
+**QA — probar endpoints protegidos en Swagger:**
+1. `POST /api/v1/auth/login` (sin Authorize) → copiar `accessToken`
+2. Clic **Authorize** → pegar token en `bearerAuth` (o cookie `flit_access` en `sessionCookie`)
+3. Probar endpoints con candado (ej. `GET /api/v1/companies`)
+
+Verificar en JSON: `components.securitySchemes.bearerAuth` y `security` en operaciones protegidas.
 
 DEV desplegado (vía gateway YARP + nginx frontend):
 - **Swagger UI (QA):** `https://dev.abrahamc.flitsas.online/swagger`

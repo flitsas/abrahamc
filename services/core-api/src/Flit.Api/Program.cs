@@ -6,6 +6,7 @@ using OpenTelemetry.Trace;
 using Serilog;
 using Flit.Api.Endpoints;
 using Flit.Api.Middleware;
+using Flit.Api.OpenApi;
 using Flit.Infrastructure;
 using Flit.Infrastructure.MultiTenant;
 using Flit.Infrastructure.Persistence;
@@ -341,6 +342,8 @@ builder.Services.ConfigureHttpJsonOptions(opts =>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddOpenApi("v1", options =>
 {
+    FlitOpenApiSecurityTransformers.Configure(options);
+
     options.AddDocumentTransformer((document, context, _) =>
     {
         document.Info = new()
@@ -481,6 +484,7 @@ if (ShouldExposeApiDocs(app.Environment))
         options.SwaggerEndpoint("/openapi/v1.json", "FLIT Core API v1");
         options.RoutePrefix = "swagger";
         options.DocumentTitle = "FLIT Core API — Swagger";
+        options.ConfigObject.PersistAuthorization = true;
     });
 }
 
