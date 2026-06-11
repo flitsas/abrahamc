@@ -18,7 +18,13 @@ export function EditCompanyDialog({
   onSuccess,
 }: EditCompanyDialogProps) {
   const titleId = useId();
-  const updateCompany = useUpdateCompany(company.id);
+  const {
+    mutateAsync: updateCompanyAsync,
+    reset: resetUpdateCompany,
+    isPending,
+    isError,
+    error,
+  } = useUpdateCompany(company.id);
   const [legalName, setLegalName] = useState(company.legalName);
   const [commercialName, setCommercialName] = useState(
     company.commercialName ?? "",
@@ -30,9 +36,14 @@ export function EditCompanyDialog({
     }
     setLegalName(company.legalName);
     setCommercialName(company.commercialName ?? "");
-    updateCompany.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset form only when dialog opens
-  }, [open, company.id, company.legalName, company.commercialName]);
+    resetUpdateCompany();
+  }, [
+    open,
+    company.id,
+    company.legalName,
+    company.commercialName,
+    resetUpdateCompany,
+  ]);
 
   if (!open) {
     return null;
@@ -42,7 +53,7 @@ export function EditCompanyDialog({
     event.preventDefault();
 
     try {
-      await updateCompany.mutateAsync({
+      await updateCompanyAsync({
         legalName: legalName.trim(),
         commercialName: commercialName.trim() || undefined,
         modulesEnabledJson: company.modulesEnabledJson,
@@ -97,9 +108,9 @@ export function EditCompanyDialog({
             placeholder="Opcional"
           />
 
-          {updateCompany.isError && (
+          {isError && (
             <p className="text-sm text-flit-danger" role="alert">
-              {updateCompany.error.message}
+              {error.message}
             </p>
           )}
 
@@ -113,10 +124,10 @@ export function EditCompanyDialog({
             </button>
             <GradientButton
               type="submit"
-              disabled={updateCompany.isPending}
+              disabled={isPending}
               className="!h-12 !w-auto !px-8 !text-sm"
             >
-              {updateCompany.isPending ? "Guardando…" : "Guardar cambios"}
+              {isPending ? "Guardando…" : "Guardar cambios"}
             </GradientButton>
           </div>
         </form>

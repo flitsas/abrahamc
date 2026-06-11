@@ -15,7 +15,13 @@ export function CreateCompanyDialog({
   onSuccess,
 }: CreateCompanyDialogProps) {
   const titleId = useId();
-  const createCompany = useCreateCompany();
+  const {
+    mutateAsync: createCompanyAsync,
+    reset: resetCreateCompany,
+    isPending,
+    isError,
+    error,
+  } = useCreateCompany();
   const [nit, setNit] = useState("");
   const [legalName, setLegalName] = useState("");
   const [commercialName, setCommercialName] = useState("");
@@ -29,9 +35,8 @@ export function CreateCompanyDialog({
     setLegalName("");
     setCommercialName("");
     setContactEmail("");
-    createCompany.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset form only when dialog opens
-  }, [open]);
+    resetCreateCompany();
+  }, [open, resetCreateCompany]);
 
   if (!open) {
     return null;
@@ -41,7 +46,7 @@ export function CreateCompanyDialog({
     event.preventDefault();
 
     try {
-      const created = await createCompany.mutateAsync({
+      const created = await createCompanyAsync({
         nit: nit.trim(),
         legalName: legalName.trim(),
         commercialName: commercialName.trim() || undefined,
@@ -110,9 +115,9 @@ export function CreateCompanyDialog({
             placeholder="contacto@empresa.com"
           />
 
-          {createCompany.isError && (
+          {isError && (
             <p className="text-sm text-flit-danger" role="alert">
-              {createCompany.error.message}
+              {error.message}
             </p>
           )}
 
@@ -126,10 +131,10 @@ export function CreateCompanyDialog({
             </button>
             <GradientButton
               type="submit"
-              disabled={createCompany.isPending}
+              disabled={isPending}
               className="!h-12 !w-auto !px-8 !text-sm"
             >
-              {createCompany.isPending ? "Creando…" : "Crear compañía"}
+              {isPending ? "Creando…" : "Crear compañía"}
             </GradientButton>
           </div>
         </form>
