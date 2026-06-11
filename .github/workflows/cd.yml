@@ -127,7 +127,7 @@ jobs:
         run: |
           set -euo pipefail
           # Falla rapido y nombra el secret faltante (en vez de un exit 1 opaco)
-          : "${SSH_HOST:?Falta el secret HOSTINGER_SSH_KEY}"
+          : "${SSH_HOST:?Falta el secret HOSTINGER_SSH_HOST}"
           : "${SSH_USER:?Falta el secret HOSTINGER_SSH_USER}"
           : "${DEPLOY_PATH:?Falta el secret HOSTINGER_DEPLOY_PATH}"
           [ -n "$SSH_KEY" ] || { echo "Falta el secret HOSTINGER_SSH_KEY"; exit 1; }
@@ -135,8 +135,20 @@ jobs:
           printf '%s\n' "$SSH_KEY" > /tmp/deploy_key
           chmod 600 /tmp/deploy_key
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
-          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts \
-            || { echo "ssh-keyscan no pudo alcanzar el host"; exit 1; }
+          # Best-effort: ssh/scp usan StrictHostKeyChecking=accept-new; no fallar el
+          # pipeline por un timeout transitorio de red hacia el VPS.
+          keyscan_ok=0
+          for attempt in 1 2 3 4 5; do
+            if ssh-keyscan -T 10 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null; then
+              keyscan_ok=1
+              break
+            fi
+            echo "ssh-keyscan intento $attempt falló, reintentando en 3s..."
+            sleep 3
+          done
+          if [ "$keyscan_ok" -ne 1 ]; then
+            echo "WARN: ssh-keyscan no alcanzó $SSH_HOST; se continúa con accept-new"
+          fi
 
           ssh -i /tmp/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
             "$SSH_USER@$SSH_HOST" "mkdir -p '$DEPLOY_PATH'"
@@ -183,20 +195,24 @@ jobs:
             # funcione igual en produccion y develop con sus propios puertos.
             FE_PORT="$(grep -E '^FRONTEND_PORT=' .env 2>/dev/null | head -1 | cut -d= -f2 || true)"
             GW_PORT="$(grep -E '^GATEWAY_PORT=' .env 2>/dev/null | head -1 | cut -d= -f2 || true)"
+            CA_PORT="$(grep -E '^CORE_API_PORT=' .env 2>/dev/null | head -1 | cut -d= -f2 || true)"
             FE_PORT="${FE_PORT:-40105}"
             GW_PORT="${GW_PORT:-40205}"
-            echo "Waiting for application to start (front:$FE_PORT gateway:$GW_PORT)..."
+            CA_PORT="${CA_PORT:-40305}"
+            echo "Waiting for application to start (front:$FE_PORT gateway:$GW_PORT core-api:$CA_PORT)..."
             sleep 15
             ok=0
             for i in 1 2 3 4 5 6; do
-              # Front + API publica del gateway deben responder.
+              # Front + gateway + core-api deben responder (sin core-api la UI queda cargando).
               if curl -fsS "http://127.0.0.1:${FE_PORT}/" > /dev/null \
-                 && curl -fsS "http://127.0.0.1:${GW_PORT}/health" > /dev/null; then
+                 && curl -fsS "http://127.0.0.1:${GW_PORT}/health" > /dev/null \
+                 && curl -fsS "http://127.0.0.1:${CA_PORT}/api/v1/health" > /dev/null; then
                 echo "Health check OK (attempt $i)"
                 ok=1
                 break
               fi
               echo "Attempt $i failed, retrying in 5s..."
+              docker compose -f docker-compose.prod.yml ps
               sleep 5
             done
             if [ "$ok" -ne 1 ]; then

@@ -19,7 +19,11 @@ RUN dotnet publish src/Flit.Api/Flit.Api.csproj \
 RUN dotnet publish src/Flit.Gateway/Flit.Gateway.csproj \
     -c Release -o /app/gateway /p:PublishAot=false /p:IsAotCompatible=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
+# Bookworm (glibc): QuestPDF/SkiaSharp fallan con SIGSEGV (exit 139) en Alpine/musl.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/api ./api
 COPY --from=build /app/gateway ./gateway
@@ -27,6 +31,6 @@ COPY --from=build /app/gateway ./gateway
 EXPOSE 8081
 ENV ASPNETCORE_URLS=http://+:8081
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
-  CMD wget -qO- http://localhost:8081/api/v1/health || exit 1
+  CMD curl -fsS http://localhost:8081/api/v1/health || exit 1
 # Default: Flit.Api. El servicio gateway sobreescribe `command` en el compose.
 CMD ["dotnet", "/app/api/Flit.Api.dll"]
