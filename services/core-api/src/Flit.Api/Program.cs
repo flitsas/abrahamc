@@ -361,6 +361,13 @@ builder.Services.AddOpenApi("v1", options =>
                 .FirstOrDefault() ?? request.Scheme;
             var host = request.Headers[ForwardedHeadersDefaults.XForwardedHostHeaderName]
                 .FirstOrDefault() ?? request.Host.Value;
+            if (!string.IsNullOrEmpty(host)
+                && host.Contains("flitsas.online", StringComparison.OrdinalIgnoreCase)
+                && !scheme.Equals("https", StringComparison.OrdinalIgnoreCase))
+            {
+                scheme = "https";
+            }
+
             document.Servers = [new() { Url = $"{scheme}://{host}/" }];
         }
 
