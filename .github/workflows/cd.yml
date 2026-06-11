@@ -99,8 +99,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            VITE_API_BASE_URL=https://${{ github.ref == 'refs/heads/release' && 'api.abrahamc.flitsas.online' || 'dev.api.abrahamc.flitsas.online' }}/api/v1
-            VITE_TRASPASOS_API_BASE_URL=https://${{ github.ref == 'refs/heads/release' && 'api.abrahamc.flitsas.online' || 'dev.api.abrahamc.flitsas.online' }}/api/v1/procedures
+            VITE_API_BASE_URL=/api/v1
             VITE_DEV_USER_ID=01900000-100b-7001-8001-000000000001
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend

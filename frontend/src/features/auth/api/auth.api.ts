@@ -36,11 +36,12 @@ export function useAuthMe(enabled = true) {
     queryKey: queryKeys.auth.me,
     queryFn: fetchAuthMe,
     enabled,
+    // Sin sesión (401) ya se resuelve en fetchAuthMe; no bloquear la UI con reintentos largos.
     retry: (failureCount, error) =>
       error instanceof ApiError &&
       error.status === undefined &&
-      failureCount < 8,
-    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 8_000),
+      failureCount < 1,
+    retryDelay: 500,
     staleTime: 60_000,
   });
 }
