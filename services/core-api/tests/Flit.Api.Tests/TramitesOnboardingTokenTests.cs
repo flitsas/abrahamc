@@ -11,7 +11,7 @@ public sealed class TramitesOnboardingTokenTests
     public void VerifySignature_FailsWhenExpiresAtDriftsAfterPostgresRoundTrip()
     {
         var invitationId = Guid.Parse("019eb785-db0e-7137-b74f-1b33d3894244");
-        var token = "SYn-oaBvYi1ScMrj8CtBmqDvnedFOREhow3HNkjAkEw";
+        var token = "flit_test-onboarding-token";
         var inMemory = new DateTimeOffset(2026, 6, 12, 15, 30, 45, 123, TimeSpan.Zero).AddTicks(4567);
         var postgres = TramitesOnboardingToken.NormalizeExpiresAtForStorage(inMemory);
 

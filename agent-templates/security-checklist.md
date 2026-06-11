@@ -1,5 +1,17 @@
 # Security Checklist — FLIT
 
+## Puerta pre-push (push directo a `develop` o sin PR)
+
+Si haces **commit + push** sin PR, CI corre **después** del push. Ejecuta **antes** (misma sesión):
+
+1. `dotnet test services/core-api/tests/Flit.Api.Tests/Flit.Api.Tests.csproj` (si tocaste backend)
+2. `gitleaks detect --source . --config .gitleaks.toml --no-git --redact --exit-code 1`
+3. Atajo: `pnpm run validate:pre-push` (Linux/macOS/Git Bash) o `pnpm run validate:pre-push:win` (Windows)
+
+Regla Cursor obligatoria: `.cursor/rules/pre-push-gate.mdc`.
+
+---
+
 ## Para desarrolladores (inline review — antes de abrir PR)
 
 Verifica manualmente estos 7 patrones ANTES de abrir la PR:

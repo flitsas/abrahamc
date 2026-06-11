@@ -195,6 +195,12 @@ gh pr merge <N> --merge   # o --squash según estrategia acordada
 
 ---
 
+## Push directo a `develop` (sin PR)
+
+Si el usuario pide **push directo** (sin `gh pr create`), el agente implementador debe cumplir **`.cursor/rules/pre-push-gate.mdc`** antes del push: `dotnet test`, gitleaks y resumen PASS/FAIL al usuario. Las pre-condiciones de merge (#5–#6) aplican igual en CI post-push.
+
+---
+
 ## Pre-condiciones merge (GitHub) — antes de ejecutar `gh pr merge`
 
 Aplican solo si integration-agent **ejecuta** el merge (con «sí» textual). **No** aplican en Modo B de solo verificación.

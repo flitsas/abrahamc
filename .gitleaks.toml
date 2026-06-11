@@ -15,3 +15,9 @@ stopwords = [
   "flit_local",
   "flit_test",
 ]
+
+[[allowlists]]
+description = "Unit test fixtures may contain fake tokens with high entropy"
+paths = [
+  '''services/core-api/tests/''',
+]
