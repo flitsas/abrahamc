@@ -29,7 +29,12 @@ public static class ListCompanyModuleConfigs
     }
 
     internal static ConfigDto Map(CompanyModuleConfig c) => new(
-        c.Id, c.ModuleKey, c.ConfigJson, c.IsActive, c.Version, c.UpdatedAt);
+        c.Id,
+        c.ModuleKey,
+        CompanyModuleConfigSchema.MaskForResponse(c.ModuleKey, c.ConfigJson),
+        c.IsActive,
+        c.Version,
+        c.UpdatedAt);
 }
 
 public static class GetCompanyModuleConfig
@@ -41,7 +46,8 @@ public static class GetCompanyModuleConfig
         ICompanyModuleConfigsRepository repo,
         CancellationToken ct = default)
     {
-        var row = await repo.GetByTenantAndModuleAsync(query.TenantId, query.ModuleKey, ct);
+        var moduleKey = CompanyModuleKey.Normalize(query.ModuleKey);
+        var row = await repo.GetByTenantAndModuleAsync(query.TenantId, moduleKey, ct);
         return row is null ? null : ListCompanyModuleConfigs.Map(row);
     }
 }
@@ -50,6 +56,7 @@ public enum UpsertModuleConfigErrorCode
 {
     InvalidModuleKey,
     InvalidConfigJson,
+    InvalidConfigSchema,
 }
 
 public sealed record UpsertModuleConfigError(UpsertModuleConfigErrorCode Code, string Message);
@@ -77,12 +84,13 @@ public static class UpsertCompanyModuleConfig
         IClock clock,
         CancellationToken ct = default)
     {
-        if (!CompanyModuleKey.All.Contains(cmd.ModuleKey))
+        var moduleKey = CompanyModuleKey.Normalize(cmd.ModuleKey);
+        if (!CompanyModuleKey.All.Contains(moduleKey))
         {
             return Result<Response, UpsertModuleConfigError>.Failure(
                 new UpsertModuleConfigError(
                     UpsertModuleConfigErrorCode.InvalidModuleKey,
-                    $"module_key inválido: '{cmd.ModuleKey}'. Valores: registration, transfers, company, runt_contingency."));
+                    $"module_key inválido: '{cmd.ModuleKey}'. Valores: registration, transfers, company, runt_contingency, recaudo (alias: matricula)."));
         }
 
         if (!IsValidJson(cmd.ConfigJson))
@@ -93,13 +101,22 @@ public static class UpsertCompanyModuleConfig
                     "config debe ser JSON válido."));
         }
 
+        var schemaError = CompanyModuleConfigSchema.Validate(moduleKey, cmd.ConfigJson);
+        if (schemaError is not null)
+        {
+            return Result<Response, UpsertModuleConfigError>.Failure(
+                new UpsertModuleConfigError(
+                    UpsertModuleConfigErrorCode.InvalidConfigSchema,
+                    schemaError));
+        }
+
         var now = clock.UtcNow;
-        var existing = await repo.GetByTenantAndModuleAsync(cmd.TenantId, cmd.ModuleKey, ct);
+        var existing = await repo.GetByTenantAndModuleAsync(cmd.TenantId, moduleKey, ct);
         if (existing is null)
         {
             var created = CompanyModuleConfig.Create(
                 cmd.TenantId,
-                cmd.ModuleKey,
+                moduleKey,
                 cmd.ConfigJson,
                 cmd.ActorUserId,
                 now,
@@ -108,7 +125,12 @@ public static class UpsertCompanyModuleConfig
             await repo.AddAsync(created, ct);
             await saveChanges(ct);
             return Result<Response, UpsertModuleConfigError>.Success(
-                new Response(cmd.ModuleKey, created.ConfigJson, created.Version, created.UpdatedAt, true));
+                new Response(
+                    moduleKey,
+                    CompanyModuleConfigSchema.MaskForResponse(moduleKey, created.ConfigJson),
+                    created.Version,
+                    created.UpdatedAt,
+                    true));
         }
 
         existing.ApplyHotReload(cmd.ConfigJson, cmd.IsActive, cmd.ActorUserId, now);
@@ -116,7 +138,12 @@ public static class UpsertCompanyModuleConfig
         await saveChanges(ct);
 
         return Result<Response, UpsertModuleConfigError>.Success(
-            new Response(cmd.ModuleKey, existing.ConfigJson, existing.Version, existing.UpdatedAt, true));
+            new Response(
+                moduleKey,
+                CompanyModuleConfigSchema.MaskForResponse(moduleKey, existing.ConfigJson),
+                existing.Version,
+                existing.UpdatedAt,
+                true));
     }
 
     private static bool IsValidJson(string json)

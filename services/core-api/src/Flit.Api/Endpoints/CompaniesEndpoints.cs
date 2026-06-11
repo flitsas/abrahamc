@@ -128,10 +128,97 @@ public static class CompaniesEndpoints
                 {
                     UpsertModuleConfigErrorCode.InvalidModuleKey => Results.BadRequest(err),
                     UpsertModuleConfigErrorCode.InvalidConfigJson => Results.BadRequest(err),
+                    UpsertModuleConfigErrorCode.InvalidConfigSchema => Results.BadRequest(err),
                     _ => Results.Problem(err.Message),
                 });
         })
         .WithName("UpsertCompanyModuleConfig");
+
+        var tenantConfigs = group.MapGroup("/{tenantId:guid}/module-configs")
+            .WithTags("Companies - Module Config (tenant)")
+            .AddEndpointFilter(new TramitesPermissionFilter("modulo.companias.crud-total"));
+
+        tenantConfigs.MapGet("/", async (
+            Guid tenantId,
+            ICompanyModuleConfigsRepository repo,
+            ICompaniesSessionContext session,
+            CancellationToken ct) =>
+        {
+            var denied = DenyCrossTenantAccess(tenantId, session);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var response = await ListCompanyModuleConfigs.HandleAsync(
+                new ListCompanyModuleConfigs.Query(tenantId), repo, ct);
+            return Results.Ok(response);
+        })
+        .WithName("ListCompanyModuleConfigsByTenant");
+
+        tenantConfigs.MapGet("/{moduleKey}", async (
+            Guid tenantId,
+            string moduleKey,
+            ICompanyModuleConfigsRepository repo,
+            ICompaniesSessionContext session,
+            CancellationToken ct) =>
+        {
+            var denied = DenyCrossTenantAccess(tenantId, session);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var config = await GetCompanyModuleConfig.HandleAsync(
+                new GetCompanyModuleConfig.Query(tenantId, moduleKey), repo, ct);
+            return config is null ? Results.NotFound() : Results.Ok(config);
+        })
+        .WithName("GetCompanyModuleConfigByTenant");
+
+        tenantConfigs.MapPut("/{moduleKey}", async (
+            Guid tenantId,
+            string moduleKey,
+            UpsertModuleConfigRequest req,
+            ICompanyModuleConfigsRepository repo,
+            IUnitOfWork uow,
+            ICompaniesSessionContext session,
+            IClock clock,
+            CancellationToken ct) =>
+        {
+            var denied = DenyCrossTenantAccess(tenantId, session);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var actorId = session.ActorUserId ?? Guid.Parse("00000000-0000-7000-8000-000000000001");
+            var result = await UpsertCompanyModuleConfig.HandleAsync(
+                new UpsertCompanyModuleConfig.Command(
+                    tenantId,
+                    moduleKey,
+                    req.ConfigJson,
+                    req.IsActive,
+                    actorId),
+                repo,
+                async innerCt =>
+                {
+                    await uow.SaveChangesAsync(innerCt);
+                    return 0;
+                },
+                clock,
+                ct);
+
+            return result.Match(
+                ok => Results.Ok(ok),
+                err => err.Code switch
+                {
+                    UpsertModuleConfigErrorCode.InvalidModuleKey => Results.BadRequest(err),
+                    UpsertModuleConfigErrorCode.InvalidConfigJson => Results.BadRequest(err),
+                    UpsertModuleConfigErrorCode.InvalidConfigSchema => Results.BadRequest(err),
+                    _ => Results.Problem(err.Message),
+                });
+        })
+        .WithName("UpsertCompanyModuleConfigByTenant");
 
         group.MapGet("/signature-wallet", async (
             ICompanyModuleConfigsRepository repo,
@@ -492,4 +579,22 @@ public static class CompaniesEndpoints
     }
 
     private static Guid? ResolveTenantId(ICompaniesSessionContext session) => session.TenantId;
+
+    /// <summary>AC4 #9688 — tenant A no puede leer config del tenant B.</summary>
+    private static IResult? DenyCrossTenantAccess(Guid requestedTenantId, ICompaniesSessionContext session)
+    {
+        if (session.IsSuperAdmin)
+        {
+            return null;
+        }
+
+        if (session.TenantId != requestedTenantId)
+        {
+            return Results.Json(
+                new { error = "Acceso denegado al tenant solicitado." },
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        return null;
+    }
 }
