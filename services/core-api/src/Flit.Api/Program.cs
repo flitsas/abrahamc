@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -337,9 +338,10 @@ builder.Services.ConfigureHttpJsonOptions(opts =>
     opts.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
 });
 
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddOpenApi("v1", options =>
 {
-    options.AddDocumentTransformer((document, _, _) =>
+    options.AddDocumentTransformer((document, context, _) =>
     {
         document.Info = new()
         {
@@ -348,6 +350,20 @@ builder.Services.AddOpenApi("v1", options =>
             Description =
                 "Contrato REST core-api (Trámites 2.0). Spec canónica versionada: docs/openapi.yaml",
         };
+
+        var httpContext = context.ApplicationServices
+            .GetRequiredService<IHttpContextAccessor>()
+            .HttpContext;
+        if (httpContext is not null)
+        {
+            var request = httpContext.Request;
+            var scheme = request.Headers[ForwardedHeadersDefaults.XForwardedProtoHeaderName]
+                .FirstOrDefault() ?? request.Scheme;
+            var host = request.Headers[ForwardedHeadersDefaults.XForwardedHostHeaderName]
+                .FirstOrDefault() ?? request.Host.Value;
+            document.Servers = [new() { Url = $"{scheme}://{host}/" }];
+        }
+
         return Task.CompletedTask;
     });
 });
@@ -410,8 +426,6 @@ app.MapGet("/api/v1/health", () => new HealthResponse(
 .WithTags("System");
 
 app.MapOpenApi();
-app.MapGet("/swagger", () => Results.Redirect("/openapi/v1.json"))
-    .ExcludeFromDescription();
 
 app.MapGet("/", () => Results.Redirect("/api/v1/health"));
 
@@ -453,7 +467,20 @@ app.MapIdSecureOperatorEndpoints();
 app.MapDevSeedEndpoints(app.Environment);
 app.MapFlitNotificationsHub();
 
+if (ShouldExposeApiDocs(app.Environment))
+{
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/openapi/v1.json", "FLIT Core API v1");
+        options.RoutePrefix = "swagger";
+        options.DocumentTitle = "FLIT Core API — Swagger";
+    });
+}
+
 app.Run();
+
+static bool ShouldExposeApiDocs(IHostEnvironment env) =>
+    !env.IsProduction() && !env.IsEnvironment("PDN");
 
 static bool TryReadJwtKeyFiles(
     string contentRoot,

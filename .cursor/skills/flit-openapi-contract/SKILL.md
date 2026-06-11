@@ -55,11 +55,12 @@ dotnet build src/Flit.Api/Flit.Api.csproj
 curl -s http://localhost:3030/openapi/v1.json | head
 ```
 
-Local: `http://localhost:3030/openapi/v1.json` (alias `/swagger` → redirect)
+Local: `http://localhost:3030/swagger` (Swagger UI) · spec JSON: `/openapi/v1.json`
 
 DEV desplegado (vía gateway YARP + nginx frontend):
-- `https://dev.api.abrahamc.flitsas.online/openapi/v1.json`
-- `https://dev.abrahamc.flitsas.online/openapi/v1.json` (recomendado para QA — mismo origen que el SPA)
+- **Swagger UI (QA):** `https://dev.abrahamc.flitsas.online/swagger`
+- Spec JSON: `https://dev.abrahamc.flitsas.online/openapi/v1.json`
+- Alternativa API: `https://dev.api.abrahamc.flitsas.online/swagger`
 
 **No usar** `dev.core.abrahamc.flitsas.online` — no tiene registro DNS; core-api es interno al compose.
 

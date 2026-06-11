@@ -36,6 +36,7 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
     <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" />
   </ItemGroup>
 
 </Project>
