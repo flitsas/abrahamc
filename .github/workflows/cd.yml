@@ -183,8 +183,8 @@ jobs:
             # funcione igual en produccion y develop con sus propios puertos.
             FE_PORT="$(grep -E '^FRONTEND_PORT=' .env 2>/dev/null | head -1 | cut -d= -f2 || true)"
             GW_PORT="$(grep -E '^GATEWAY_PORT=' .env 2>/dev/null | head -1 | cut -d= -f2 || true)"
-            FE_PORT="${FE_PORT:-60106}"
-            GW_PORT="${GW_PORT:-60206}"
+            FE_PORT="${FE_PORT:-40105}"
+            GW_PORT="${GW_PORT:-40205}"
             echo "Waiting for application to start (front:$FE_PORT gateway:$GW_PORT)..."
             sleep 15
             ok=0

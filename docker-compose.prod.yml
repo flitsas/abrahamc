@@ -3,9 +3,9 @@
 # Postgres NO esta aqui: corre en el HOST (host.docker.internal:5432).
 # El reverse-proxy del HOST termina TLS y enruta los dominios a los puertos
 # publicados en 127.0.0.1:
-#   abrahamc.flitsas.online      -> frontend  (127.0.0.1:60106)
-#   api.abrahamc.flitsas.online  -> gateway   (127.0.0.1:60206)  [API publica YARP]
-#   core.abrahamc.flitsas.online -> core-api  (127.0.0.1:60306)  [Flit.Api interno/debug]
+#   dev.abrahamc.flitsas.online     -> frontend  (127.0.0.1:40105)
+#   api.dev.abrahamc.flitsas.online -> gateway   (127.0.0.1:40205)  [API publica YARP]
+#   core.dev.abrahamc.flitsas.online -> core-api (127.0.0.1:40305)  [Flit.Api interno/debug]
 #
 # Variables requeridas en .env (junto al compose):
 #   CONNECTION_STRING_CORE  cadena Npgsql .NET (Host=...;Port=5432;Database=...;Username=...;Password=...)
@@ -13,7 +13,7 @@
 #   VERIFIK_API_TOKEN       token Verifik (RUNT)
 # Variables para AISLAR este proyecto del resto del VPS (UNICAS por proyecto):
 #   COMPOSE_PROJECT_NAME    nombre del proyecto Compose (default: flit-prod)
-#   FRONTEND_PORT / GATEWAY_PORT / CORE_API_PORT   puertos host 127.0.0.1 (defaults: 60106/60206/60306)
+#   FRONTEND_PORT / GATEWAY_PORT / CORE_API_PORT   puertos host 127.0.0.1 (defaults: 40105/40205/40305)
 # Variables opcionales:
 #   GHCR_NAMESPACE                paquete GHCR (default: abrahamc-dev)
 #   CORE_API_TAG / FRONTEND_TAG   tag de imagen (default: develop)
@@ -67,7 +67,7 @@ services:
       Smtp__From: ${SMTP_FROM:-}
       Smtp__FromName: ${SMTP_FROM_NAME:-FLIT Tramites}
     ports:
-      - "127.0.0.1:${CORE_API_PORT:-40305}:80"
+      - "127.0.0.1:${CORE_API_PORT:-40305}:8081"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8081/api/v1/health"]
       interval: 30s
@@ -90,7 +90,7 @@ services:
       # Login deshabilitado temporalmente: sin llave JWT el gateway no valida firma
       # ni exige autenticación (ver Flit.Gateway/Program.cs).
     ports:
-      - "127.0.0.1:${GATEWAY_PORT:-40205}:80"
+      - "127.0.0.1:${GATEWAY_PORT:-40205}:8080"
     depends_on:
       core-api:
         condition: service_started
