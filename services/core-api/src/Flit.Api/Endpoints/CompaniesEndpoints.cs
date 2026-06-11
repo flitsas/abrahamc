@@ -7,7 +7,7 @@ using Flit.SharedKernel;
 namespace Flit.Api.Endpoints;
 
 /// <summary>
-/// HU #9445 / #9687 — Consola indexación B2B SuperAdmin (listar, crear, editar).
+/// HU #9445 / #9687 / #9689 — Consola indexación B2B SuperAdmin (listar, crear, editar) y gobierno tenant.
 /// Permisos: <c>modulo.companias.ver</c> (GET), <c>modulo.companias.gestionar</c> (POST),
 /// <c>modulo.companias.crud-total</c> (configs/RUNT/ownership).
 /// </summary>
@@ -46,6 +46,12 @@ public static class CompaniesEndpoints
         string? ProcedureType = null,
         int? ModelYear = null,
         string? ApprovedExceptionCode = null);
+
+    public sealed record CreateVehicleExceptionRequest(Guid UserId, string? Reason, DateTimeOffset? ExpiresAt = null);
+
+    public sealed record UpsertAuthorizedTrafficAgencyRequest(Guid TrafficAgencyId, bool IsEnabled);
+
+    public sealed record VehicleAccessCheckRequest(string Plate, Guid? UserId = null);
 
     public static void MapCompaniesEndpoints(this IEndpointRouteBuilder app)
     {
@@ -220,6 +226,221 @@ public static class CompaniesEndpoints
         })
         .WithName("UpsertCompanyModuleConfigByTenant");
 
+        var governance = group.MapGroup("/{tenantId:guid}")
+            .WithTags("Companies - Tenant Governance")
+            .AddEndpointFilter(new TramitesPermissionFilter("modulo.companias.crud-total"));
+
+        governance.MapGet("/vehicle-exceptions", async (
+            Guid tenantId,
+            ITenantGovernanceRepository repo,
+            ICompaniesSessionContext session,
+            CancellationToken ct) =>
+        {
+            var denied = DenyCrossTenantAccess(tenantId, session);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var items = await ListTenantUserExceptions.HandleAsync(
+                new ListTenantUserExceptions.Query(tenantId), repo, ct);
+            return Results.Ok(items);
+        })
+        .WithName("ListTenantUserExceptions");
+
+        governance.MapPost("/vehicle-exceptions", async (
+            Guid tenantId,
+            CreateVehicleExceptionRequest req,
+            ITenantGovernanceRepository repo,
+            IUnitOfWork uow,
+            ICompaniesSessionContext session,
+            CancellationToken ct) =>
+        {
+            var denied = DenyCrossTenantAccess(tenantId, session);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var actorId = session.ActorUserId ?? Guid.Parse("00000000-0000-7000-8000-000000000001");
+            var result = await AddTenantUserExemption.HandleAsync(
+                new AddTenantUserExemption.Command(
+                    tenantId,
+                    req.UserId,
+                    req.Reason,
+                    req.ExpiresAt,
+                    actorId),
+                repo,
+                ct => uow.SaveChangesAsync(ct),
+                ct);
+
+            return result.Match(
+                ok => Results.Created(
+                    $"/api/v1/companies/{tenantId}/vehicle-exceptions/{ok.Id}",
+                    ok),
+                err => err.Code switch
+                {
+                    TenantGovernanceErrorCode.InvalidUserId => Results.BadRequest(err),
+                    _ => Results.Problem(err.Message),
+                });
+        })
+        .WithName("CreateTenantUserException");
+
+        governance.MapDelete("/vehicle-exceptions/{exceptionId:guid}", async (
+            Guid tenantId,
+            Guid exceptionId,
+            ITenantGovernanceRepository repo,
+            IUnitOfWork uow,
+            ICompaniesSessionContext session,
+            CancellationToken ct) =>
+        {
+            var denied = DenyCrossTenantAccess(tenantId, session);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var actorId = session.ActorUserId ?? Guid.Parse("00000000-0000-7000-8000-000000000001");
+            var result = await RemoveTenantUserExemption.HandleAsync(
+                new RemoveTenantUserExemption.Command(tenantId, exceptionId, actorId),
+                repo,
+                ct => uow.SaveChangesAsync(ct),
+                ct);
+
+            return result.Match(
+                _ => Results.NoContent(),
+                err => err.Code switch
+                {
+                    TenantGovernanceErrorCode.NotFound => Results.NotFound(),
+                    _ => Results.Problem(err.Message),
+                });
+        })
+        .WithName("DeleteTenantUserException");
+
+        governance.MapGet("/authorized-traffic-agencies", async (
+            Guid tenantId,
+            ITenantGovernanceRepository repo,
+            ICompaniesSessionContext session,
+            CancellationToken ct) =>
+        {
+            var denied = DenyCrossTenantAccess(tenantId, session);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var items = await ListAuthorizedTrafficAgencies.HandleAsync(
+                new ListAuthorizedTrafficAgencies.Query(tenantId), repo, ct);
+            return Results.Ok(items);
+        })
+        .WithName("ListAuthorizedTrafficAgencies");
+
+        governance.MapPut("/authorized-traffic-agencies", async (
+            Guid tenantId,
+            UpsertAuthorizedTrafficAgencyRequest req,
+            ITenantGovernanceRepository repo,
+            IUnitOfWork uow,
+            ICompaniesSessionContext session,
+            CancellationToken ct) =>
+        {
+            var denied = DenyCrossTenantAccess(tenantId, session);
+            if (denied is not null)
+            {
+                return denied;
+            }
+
+            var actorId = session.ActorUserId ?? Guid.Parse("00000000-0000-7000-8000-000000000001");
+            var response = await UpsertAuthorizedTrafficAgency.HandleAsync(
+                new UpsertAuthorizedTrafficAgency.Command(
+                    tenantId,
+                    req.TrafficAgencyId,
+                    req.IsEnabled,
+                    actorId),
+                repo,
+                ct => uow.SaveChangesAsync(ct),
+                ct);
+
+            return Results.Ok(response);
+        })
+        .WithName("UpsertAuthorizedTrafficAgency");
+
+        group.MapPost("/vehicle-access/check", async (
+            VehicleAccessCheckRequest req,
+            ICompanyModuleConfigsRepository configRepo,
+            ITenantGovernanceRepository governanceRepo,
+            ICompaniesSessionContext session,
+            CancellationToken ct) =>
+        {
+            var tenantId = ResolveTenantId(session);
+            if (tenantId is null)
+            {
+                return Results.BadRequest(new { error = "Contexto de tenant requerido." });
+            }
+
+            var userId = req.UserId ?? session.ActorUserId;
+            if (userId is null)
+            {
+                return Results.BadRequest(new { error = "user_id es requerido." });
+            }
+
+            var result = await EnforceVehicleTenantAccess.HandleAsync(
+                new EnforceVehicleTenantAccess.Command(tenantId.Value, userId.Value, req.Plate),
+                configRepo,
+                governanceRepo,
+                ct);
+
+            if (!result.IsSuccess)
+            {
+                var err = result.Error;
+                return err.Code switch
+                {
+                    VehicleTenantAccessErrorCode.MissingPlate => Results.BadRequest(err),
+                    VehicleTenantAccessErrorCode.VehicleNotOwned => Results.Json(
+                        err,
+                        statusCode: StatusCodes.Status403Forbidden),
+                    _ => Results.Problem(err.Message),
+                };
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .RequireTramitesPermission("modulo.companias.crud-total")
+        .WithName("CheckVehicleTenantAccess");
+
+        group.MapPost("/traffic-agencies/{trafficAgencyId:guid}/authorize-check", async (
+            Guid trafficAgencyId,
+            ITenantGovernanceRepository governanceRepo,
+            ICompaniesSessionContext session,
+            CancellationToken ct) =>
+        {
+            var tenantId = ResolveTenantId(session);
+            if (tenantId is null)
+            {
+                return Results.BadRequest(new { error = "Contexto de tenant requerido." });
+            }
+
+            var result = await AssertTrafficAgencyAuthorized.HandleAsync(
+                new AssertTrafficAgencyAuthorized.Command(tenantId.Value, trafficAgencyId),
+                governanceRepo,
+                ct);
+
+            if (!result.IsSuccess)
+            {
+                var err = result.Error;
+                return err.Code switch
+                {
+                    VehicleTenantAccessErrorCode.OtNotAuthorized => Results.Json(
+                        err,
+                        statusCode: StatusCodes.Status403Forbidden),
+                    _ => Results.Problem(err.Message),
+                };
+            }
+
+            return Results.Ok(result.Value);
+        })
+        .RequireTramitesPermission("modulo.companias.crud-total")
+        .WithName("CheckTrafficAgencyAuthorization");
+
         group.MapGet("/signature-wallet", async (
             ICompanyModuleConfigsRepository repo,
             ICompaniesSessionContext session,
@@ -280,15 +501,7 @@ public static class CompaniesEndpoints
 
             if (!result.IsSuccess)
             {
-                var err = result.Error;
-                return err.Code switch
-                {
-                    RuntVehicleQueryErrorCode.MissingPlate => Results.BadRequest(err),
-                    RuntVehicleQueryErrorCode.AllProvidersUnavailable => Results.Json(
-                        err,
-                        statusCode: StatusCodes.Status503ServiceUnavailable),
-                    _ => Results.Problem(err.Message),
-                };
+                return RuntEndpoints.MapRuntVehicleQueryResult(result);
             }
 
             return Results.Ok(result.Value);

@@ -179,6 +179,7 @@ public static class InfrastructureExtensions
         services.AddScoped<ICompanyTenantProvisioner, IdentityCompanyTenantProvisioner>();
         services.AddScoped<ICompaniesIndexRepository, NpgsqlCompaniesIndexRepository>();
         services.AddScoped<ICompanyModuleConfigsRepository, EfCompanyModuleConfigsRepository>();
+        services.AddScoped<ITenantGovernanceRepository, NpgsqlTenantGovernanceRepository>();
         services.AddScoped<IVehicleOwnershipRulesRepository, EfVehicleOwnershipRulesRepository>();
 
         // ── Webhooks QX (#9459 INT-02) ─────────────────────────────────
