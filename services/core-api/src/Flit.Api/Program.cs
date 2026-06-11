@@ -410,6 +410,7 @@ if (usePostgres)
     app.MapTramitesProfileEndpoints();
     app.MapTramitesSupportEndpoints();
     app.MapCompaniesEndpoints();
+    app.MapRuntEndpoints();
     app.MapIntegrationsEndpoints();
     app.MapOtEndpoints();
     app.MapOtRulesEndpoints();

@@ -6,7 +6,7 @@ namespace Flit.Modules.Companies.Domain;
 public sealed class RuntContingencyPolicy
 {
     public string Primary { get; init; } = RuntProviderCode.Verifik;
-    public IReadOnlyList<string> Failover { get; init; } = [];
+    public IReadOnlyList<string> Failover { get; init; } = [RuntProviderCode.Intempo];
     public bool MockDev { get; init; } = true;
 
     public static RuntContingencyPolicy Default => new();
@@ -52,12 +52,19 @@ public sealed class RuntContingencyPolicy
         }
     }
 
-    /// <summary>Orden de intento: RUNT primero, luego primary y failover del tenant (sin duplicados).</summary>
+    /// <summary>
+    /// Orden de intento: primary del tenant, luego failover (#9690).
+    /// RUNT nativo solo se antepone cuando es el primary configurado.
+    /// </summary>
     public IReadOnlyList<string> BuildAttemptChain()
     {
-        var chain = new List<string> { RuntProviderCode.Runt };
-        if (Primary != RuntProviderCode.Runt)
+        var chain = new List<string>();
+
+        if (Primary == RuntProviderCode.Runt)
+            chain.Add(RuntProviderCode.Runt);
+        else if (!string.IsNullOrWhiteSpace(Primary))
             chain.Add(Primary);
+
         foreach (var f in Failover)
         {
             if (!chain.Contains(f, StringComparer.Ordinal))

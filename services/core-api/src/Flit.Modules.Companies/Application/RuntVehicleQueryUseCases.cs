@@ -7,6 +7,7 @@ namespace Flit.Modules.Companies.Application;
 public enum RuntVehicleQueryErrorCode
 {
     MissingPlate,
+    VehicleNotFound,
     AllProvidersUnavailable,
 }
 
@@ -32,6 +33,7 @@ public static class QueryVehicleWithRuntContingency
         string? FailoverFrom,
         string ResultJson,
         Guid SyncLogId,
+        string Outcome,
         bool RadicationBlocked,
         Guid? ProcedureQueryResultId);
 
@@ -75,18 +77,23 @@ public static class QueryVehicleWithRuntContingency
             cmd.SimulateRuntUnavailable,
             cmd.SimulateAllProvidersDown);
 
-        string? failoverSource = null;
+        string? previousProvider = null;
+        var anyAttempt = false;
+        var onlyNotFoundFailures = true;
 
         foreach (var providerCode in chain)
         {
             if (!providerMap.TryGetValue(providerCode, out var provider))
                 continue;
 
+            anyAttempt = true;
+
             if (cmd.SimulateRuntUnavailable && providerCode == RuntProviderCode.Runt)
             {
-                await AppendLogAsync(syncLogRepo, cmd.TenantId, providerCode, "failed", null, plate, now, ct);
+                await AppendLogAsync(syncLogRepo, cmd.TenantId, providerCode, "failed", previousProvider, plate, now, ct);
                 circuitBreaker.RecordFailure(cmd.TenantId, providerCode, now);
-                failoverSource ??= RuntProviderCode.Runt;
+                onlyNotFoundFailures = false;
+                previousProvider = providerCode;
                 continue;
             }
 
@@ -97,92 +104,133 @@ public static class QueryVehicleWithRuntContingency
                     cmd.TenantId,
                     providerCode,
                     "circuit_open",
-                    failoverSource,
+                    previousProvider,
                     plate,
                     now,
                     ct);
+                onlyNotFoundFailures = false;
                 continue;
             }
 
             var attempt = await provider.QueryVehicleAsync(request, ct);
 
-            if (!attempt.Succeeded)
+            if (attempt.Succeeded)
             {
-                await AppendLogAsync(
-                    syncLogRepo,
+                circuitBreaker.RecordSuccess(cmd.TenantId, providerCode);
+                var failoverFrom = previousProvider;
+                var payload = failoverFrom is null
+                    ? attempt.ResultJson
+                    : AppendFailoverReason(attempt.ResultJson, failoverFrom);
+
+                var successLog = RuntSyncLogEntry.Create(
                     cmd.TenantId,
                     providerCode,
-                    attempt.Outcome,
-                    failoverSource,
-                    plate,
-                    now,
-                    ct,
-                    attempt.ResultJson);
-                circuitBreaker.RecordFailure(cmd.TenantId, providerCode, now);
-                failoverSource ??= providerCode == RuntProviderCode.Runt ? RuntProviderCode.Runt : failoverSource;
-                if (providerCode == RuntProviderCode.Runt)
-                    failoverSource = RuntProviderCode.Runt;
+                    Operation,
+                    RuntQueryOutcome.Ok,
+                    failoverFrom,
+                    payload,
+                    now);
+                await syncLogRepo.AddAsync(successLog, ct);
+
+                Guid? queryResultId = null;
+                if (cmd.ProcedureInstanceId is { } instanceId && instanceId != Guid.Empty)
+                {
+                    var snapshot = ProcedureQueryResultSnapshot.CreateOk(
+                        cmd.TenantId,
+                        instanceId,
+                        providerCode,
+                        attempt.ResultJson,
+                        cmd.ActorUserId,
+                        now);
+                    await queryResultsRepo.AddAsync(snapshot, ct);
+                    queryResultId = snapshot.Id;
+                }
+
+                await saveChanges(ct);
+
+                return Result<Response, RuntVehicleQueryError>.Success(
+                    new Response(
+                        providerCode,
+                        failoverFrom,
+                        attempt.ResultJson,
+                        successLog.Id,
+                        RuntQueryOutcome.Success,
+                        RadicationBlocked: false,
+                        queryResultId));
+            }
+
+            var syncOutcome = MapAttemptOutcomeToSyncLog(attempt.Outcome);
+            await AppendLogAsync(
+                syncLogRepo,
+                cmd.TenantId,
+                providerCode,
+                syncOutcome,
+                previousProvider,
+                plate,
+                now,
+                ct,
+                attempt.ResultJson);
+
+            if (attempt.Outcome == RuntQueryOutcome.NotFound)
+            {
+                previousProvider = providerCode;
                 continue;
             }
 
-            circuitBreaker.RecordSuccess(cmd.TenantId, providerCode);
-            var failoverFrom = providerCode == RuntProviderCode.Runt
-                ? null
-                : failoverSource ?? RuntProviderCode.Runt;
-
-            var successLog = RuntSyncLogEntry.Create(
-                cmd.TenantId,
-                providerCode,
-                Operation,
-                "ok",
-                failoverFrom,
-                attempt.ResultJson,
-                now);
-            await syncLogRepo.AddAsync(successLog, ct);
-
-            Guid? queryResultId = null;
-            if (cmd.ProcedureInstanceId is { } instanceId && instanceId != Guid.Empty)
-            {
-                var snapshot = ProcedureQueryResultSnapshot.CreateOk(
-                    cmd.TenantId,
-                    instanceId,
-                    providerCode,
-                    attempt.ResultJson,
-                    cmd.ActorUserId,
-                    now);
-                await queryResultsRepo.AddAsync(snapshot, ct);
-                queryResultId = snapshot.Id;
-            }
-
-            await saveChanges(ct);
-
-            return Result<Response, RuntVehicleQueryError>.Success(
-                new Response(
-                    providerCode,
-                    failoverFrom,
-                    attempt.ResultJson,
-                    successLog.Id,
-                    RadicationBlocked: false,
-                    queryResultId));
+            onlyNotFoundFailures = false;
+            circuitBreaker.RecordFailure(cmd.TenantId, providerCode, now);
+            previousProvider = providerCode;
         }
 
-        var lastProvider = chain.Count > 0 ? chain[^1] : RuntProviderCode.Runt;
+        var lastProvider = chain.Count > 0 ? chain[^1] : policy.Primary;
         var exhaustedLog = RuntSyncLogEntry.Create(
             cmd.TenantId,
             lastProvider,
             Operation,
             "circuit_open",
-            failoverSource,
+            previousProvider,
             $$"""{"plate":"{{plate}}","reason":"all_providers_exhausted"}""",
             now);
         await syncLogRepo.AddAsync(exhaustedLog, ct);
         await saveChanges(ct);
+
+        if (anyAttempt && onlyNotFoundFailures)
+        {
+            return Result<Response, RuntVehicleQueryError>.Failure(
+                new RuntVehicleQueryError(
+                    RuntVehicleQueryErrorCode.VehicleNotFound,
+                    "Vehículo no encontrado en los proveedores de consulta.",
+                    RadicationBlocked: false));
+        }
 
         return Result<Response, RuntVehicleQueryError>.Failure(
             new RuntVehicleQueryError(
                 RuntVehicleQueryErrorCode.AllProvidersUnavailable,
                 "Todos los proveedores de consulta vehicular están indisponibles. La radicación puede continuar sin bloqueo.",
                 RadicationBlocked: false));
+    }
+
+    private static string MapAttemptOutcomeToSyncLog(string attemptOutcome) =>
+        attemptOutcome switch
+        {
+            RuntQueryOutcome.NotFound => RuntQueryOutcome.Failed,
+            RuntQueryOutcome.Ok or RuntQueryOutcome.Success => RuntQueryOutcome.Ok,
+            _ => attemptOutcome,
+        };
+
+    private static string AppendFailoverReason(string resultJson, string failoverFrom)
+    {
+        if (string.IsNullOrWhiteSpace(resultJson) || resultJson == "{}")
+        {
+            return $$"""{"reason":"failover","failover_from":"{{failoverFrom}}"}""";
+        }
+
+        if (resultJson.EndsWith('}'))
+        {
+            return resultJson[..^1] + $$""","reason":"failover","failover_from":"{{failoverFrom}}"}""";
+        }
+
+        return resultJson;
     }
 
     private static async Task AppendLogAsync(

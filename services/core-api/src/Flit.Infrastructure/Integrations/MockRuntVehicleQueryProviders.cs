@@ -55,6 +55,24 @@ public sealed class MockVerifikVehicleQueryProvider : IRuntVehicleQueryProvider
                 "mock_verifik_down"));
         }
 
+        if (request.Plate == "XYZ000")
+        {
+            return Task.FromResult(new RuntVehicleQueryAttemptResult(
+                false,
+                $$"""{"plate":"{{request.Plate}}","provider":"{{ProviderCode}}"}""",
+                RuntQueryOutcome.NotFound,
+                "vehicle_not_found"));
+        }
+
+        if (request.SimulateRuntUnavailable)
+        {
+            return Task.FromResult(new RuntVehicleQueryAttemptResult(
+                false,
+                $$"""{"plate":"{{request.Plate}}","provider":"{{ProviderCode}}"}""",
+                "timeout",
+                "mock_verifik_timeout"));
+        }
+
         return Task.FromResult(new RuntVehicleQueryAttemptResult(
             true,
             $$"""{"plate":"{{request.Plate}}","make":"TOYOTA","line":"COROLLA","model_year":2020,"mock_provider":"verifik-stub"}""",
@@ -78,6 +96,15 @@ public sealed class MockIntempoVehicleQueryProvider : IRuntVehicleQueryProvider
                 $$"""{"plate":"{{request.Plate}}","provider":"{{ProviderCode}}"}""",
                 "failed",
                 "mock_intempo_down"));
+        }
+
+        if (request.Plate == "XYZ000")
+        {
+            return Task.FromResult(new RuntVehicleQueryAttemptResult(
+                false,
+                $$"""{"plate":"{{request.Plate}}","provider":"{{ProviderCode}}"}""",
+                RuntQueryOutcome.NotFound,
+                "vehicle_not_found"));
         }
 
         return Task.FromResult(new RuntVehicleQueryAttemptResult(
