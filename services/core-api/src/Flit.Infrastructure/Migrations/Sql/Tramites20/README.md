@@ -14,6 +14,16 @@
 | `AddFeatures9549_9557FoundationGaps` (`20260610144632`) | #9549 #9550 #9553 #9557 | ABAC, excepciones vehiculares, matriz OT tenant, SMTP templates, etiquetas OT |
 | `AddFeatures9549_9557DevSeed` (`20260610144706`) | #9549 #9550 #9553 #9557 | mocks DEV complementarios |
 
+## Crear migración SQL embebida (obligatorio)
+
+1. SQL en `Sql/Tramites20/<Nombre>_up.sql` y `_down.sql` (embebidos vía `Flit.Infrastructure.csproj`).
+2. Par EF en `Migrations/`:
+   - `<timestamp>_<Nombre>.cs` → `SqlMigrationHelper.ApplyEmbeddedSql(...)`
+   - **`<timestamp>_<Nombre>.Designer.cs`** → `[Migration("...")]` + `BuildTargetModel` (copiar de la migración anterior si no hay cambio de modelo EF).
+3. Verificar: `dotnet ef migrations list` debe listar la migración; `pnpm run validate:ef-migrations` antes de push.
+
+**Sin `.Designer.cs`, core-api arranca pero la tabla no se crea** (error `relation does not exist` en runtime). Ver `.cursor/rules/ef-migrations.mdc`.
+
 ## Aplicar en local (recomendado BD limpia)
 
 ```bash

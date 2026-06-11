@@ -7,6 +7,9 @@ Write-Host "==> dotnet test (Flit.Api.Tests)"
 dotnet test services/core-api/tests/Flit.Api.Tests/Flit.Api.Tests.csproj
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+& (Join-Path $PSScriptRoot "validate-ef-migrations.ps1")
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 Write-Host "==> gitleaks (solo archivos trackeados por git, mismo alcance que CI)"
 $ScanDir = Join-Path $env:TEMP ("flit-gitleaks-" + [guid]::NewGuid().ToString("n"))
 New-Item -ItemType Directory -Path $ScanDir | Out-Null

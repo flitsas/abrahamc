@@ -28,6 +28,7 @@ Por cada tabla nueva o alteración significativa:
 - [ ] **A18** No duplica tabla existente (validación semántica contra migraciones previas)
 - [ ] **A19** Entidad de negocio nueva: ADR `Propuesto` referenciado en PR/descripción
 - [ ] **A20** Catálogos: estructura §9.1 (`is_active`, sin `tenant_id`, `external_refs jsonb`)
+- [ ] **A21** EF Core: cada `<timestamp>_<Nombre>.cs` tiene su `.Designer.cs` y aparece en `dotnet ef migrations list` (regla `.cursor/rules/ef-migrations.mdc`)
 
 ---
 

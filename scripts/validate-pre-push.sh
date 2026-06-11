@@ -8,6 +8,8 @@ cd "$ROOT"
 echo "==> dotnet test (Flit.Api.Tests)"
 dotnet test services/core-api/tests/Flit.Api.Tests/Flit.Api.Tests.csproj
 
+bash "$(dirname "$0")/validate-ef-migrations.sh"
+
 echo "==> gitleaks (archivos trackeados por git — mismo alcance que CI)"
 SCAN_DIR="$(mktemp -d)"
 trap 'rm -rf "$SCAN_DIR"' EXIT

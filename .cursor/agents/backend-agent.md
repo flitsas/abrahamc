@@ -104,7 +104,7 @@ Lee antes de escribir cualquier línea de código:
    backend/dotnet/src/Flit.Api/Endpoints/<Modulo>Endpoints.cs
    ```
 
-4. **Migraciones EF Core:** `dotnet ef migrations add <Nombre>` — idempotentes, nunca modifica migraciones ya aplicadas.
+4. **Migraciones EF Core:** `dotnet ef migrations add <Nombre>` — idempotentes, nunca modifica migraciones ya aplicadas. Si el SQL va embebido, **nunca** dejes solo el `.cs`: el par `.Designer.cs` es obligatorio (ver `.cursor/rules/ef-migrations.mdc`). Valida con `pnpm run validate:ef-migrations` antes de push.
 5. **Manejo de errores:** excepciones de dominio mapeadas a HTTP status en middleware global.
 6. **Logging:** Serilog con `request_id`, sin secretos ni PII en los logs.
 7. **Actualiza `docs/openapi.yaml`** si el PR agrega o modifica contratos.

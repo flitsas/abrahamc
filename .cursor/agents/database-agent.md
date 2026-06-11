@@ -109,11 +109,13 @@ Si faltan campos, hago **UNA sola pregunta consolidada**.
 
 ## Modo B — Migración
 
-1. Convierte el DDL en migración: EF Core (`backend/dotnet/**/Migrations/`) o SQL versionado (`db/migrations/V####__*.sql`) según el patrón del repo.
+1. Convierte el DDL en migración: EF Core (`services/core-api/src/Flit.Infrastructure/Migrations/`) o SQL versionado (`db/migrations/V####__*.sql`) según el patrón del repo.
 2. Garantiza `Up` y `Down` reversibles; RLS/triggers/policies vía `migrationBuilder.Sql(...)`.
 3. Nombre referenciando la HU: `<timestamp>_HU<ID>_<DescripcionPascalCase>`.
 4. Nunca modifica migraciones ya aplicadas — siempre una nueva.
-5. Ejecuta el Modo C (validación) antes de dar la migración por lista.
+5. **Par obligatorio:** `<timestamp>_<Nombre>.cs` **y** `<timestamp>_<Nombre>.Designer.cs` con `[Migration("...")]`. Un `.cs` sin Designer **no se aplica** en deploy (`MigrateAsync` lo ignora). Regla: `.cursor/rules/ef-migrations.mdc`.
+6. Tras crear la migración: `dotnet ef migrations list` debe listarla; antes de push: `pnpm run validate:ef-migrations`.
+7. Ejecuta el Modo C (validación) antes de dar la migración por lista.
 
 ---
 

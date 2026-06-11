@@ -45,6 +45,7 @@ git diff origin/develop...HEAD -- "**/Persistence/**" "**/Repositories/**"
 rg -n "CREATE TABLE|migrationBuilder\.Sql|IgnoreQueryFilters|FromSqlRaw\(\$" --glob "*.{cs,sql}"
 rg -n "float|real|timestamp[^z]|serial|is_deleted" --glob "*.{cs,sql}"
 rg -n "@pii:" --glob "*.sql"
+pnpm run validate:ef-migrations   # .cs + .Designer.cs + migrations list
 ```
 
 ## Veredicto de datos

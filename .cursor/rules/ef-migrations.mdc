@@ -1,0 +1,69 @@
+---
+description: Migraciones EF Core — nunca .cs sin .Designer.cs; verificar con dotnet ef migrations list antes de push
+alwaysApply: false
+---
+
+# Migraciones EF Core — registro obligatorio
+
+**Cuándo aplica:** al crear o modificar archivos en `services/core-api/src/Flit.Infrastructure/Migrations/`.
+
+**Dueños:** `database-agent` (Modo B) escribe la migración; `backend-agent` la consume si toca el mismo PR. Validación: skill `db-schema-validator` + puerta pre-push.
+
+---
+
+## Por qué existe
+
+`Program.cs` aplica migraciones al arrancar core-api (`Database.MigrateAsync()`). EF Core **solo** descubre migraciones con:
+
+1. Archivo `<timestamp>_<Nombre>.cs` (clase `partial` que hereda `Migration`)
+2. Par **`*.Designer.cs`** con `[Migration("<timestamp>_<Nombre>")]` y `BuildTargetModel`
+
+Un `.cs` manual con SQL embebido **sin** `.Designer.cs` compila, pasa tests y despliega — pero **nunca crea la tabla** en DEV/PDN (`relation "…" does not exist`).
+
+---
+
+## Reglas innegociables
+
+| # | Regla |
+|---|--------|
+| 1 | **Nunca** crear solo el `.cs`; siempre par `.cs` + `.Designer.cs` |
+| 2 | Preferir `dotnet ef migrations add <Nombre>`; si el SQL va embebido, copiar el `Designer.cs` de la migración anterior (mismo `BuildTargetModel` si no hay cambio de modelo EF) |
+| 3 | Tras crear/editar migración: `dotnet ef migrations list` debe listar el `<timestamp>_<Nombre>` (idealmente como `Pending`) |
+| 4 | El CD **no** corre migraciones aparte; depende del arranque de core-api |
+| 5 | Nunca modificar migraciones ya aplicadas en ambientes — siempre una nueva |
+
+---
+
+## Verificación antes de push
+
+Si el diff toca `Migrations/`:
+
+```bash
+pnpm run validate:ef-migrations        # Linux/macOS/Git Bash
+pnpm run validate:ef-migrations:win  # Windows
+```
+
+También incluido en `pnpm run validate:pre-push` / `validate:pre-push:win`.
+
+---
+
+## Patrón SQL embebido (Trámites 2.0)
+
+```
+Migrations/
+  20260610180000_AddIdentityGlobalAuthSettings.cs      # Up/Down → SqlMigrationHelper
+  20260610180000_AddIdentityGlobalAuthSettings.Designer.cs  # OBLIGATORIO
+  Sql/Tramites20/GlobalAuthSettings_up.sql             # EmbeddedResource
+```
+
+Ver `services/core-api/src/Flit.Infrastructure/Migrations/Sql/Tramites20/README.md`.
+
+---
+
+## Mensaje al usuario (plantilla)
+
+```
+✅ EF migrations gate
+  - Designer.cs por cada .cs: PASS/FAIL
+  - dotnet ef migrations list: PASS/FAIL
+```

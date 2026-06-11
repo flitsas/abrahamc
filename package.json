@@ -14,6 +14,8 @@
     "build:api": "dotnet build services/core-api/Flit.slnx",
     "test": "dotnet test services/core-api/Flit.slnx && pnpm --filter @flit/frontend test",
     "test:api": "dotnet test services/core-api/tests/Flit.Api.Tests/Flit.Api.Tests.csproj",
+    "validate:ef-migrations": "bash scripts/validate-ef-migrations.sh",
+    "validate:ef-migrations:win": "powershell -ExecutionPolicy Bypass -File scripts/validate-ef-migrations.ps1",
     "validate:pre-push": "bash scripts/validate-pre-push.sh",
     "validate:pre-push:win": "powershell -ExecutionPolicy Bypass -File scripts/validate-pre-push.ps1",
     "migrate": "dotnet ef database update --project services/core-api/src/Flit.Infrastructure/Flit.Infrastructure.csproj --startup-project services/core-api/src/Flit.Api/Flit.Api.csproj",

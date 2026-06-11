@@ -32,3 +32,4 @@ Las demás 15 reglas se conservan tal cual:
 17. `Closed` de Feature: exclusivo del PO humano
 18. Skills externas: auditadas antes de instalar
 19. **Pre-push gate:** antes de `git push` a ramas compartidas, ejecutar la puerta de `.cursor/rules/pre-push-gate.mdc` (`pnpm run validate:pre-push` o `validate:pre-push:win`)
+20. **Migraciones EF:** nunca `.cs` sin `.Designer.cs`; ver `.cursor/rules/ef-migrations.mdc` y `pnpm run validate:ef-migrations`
