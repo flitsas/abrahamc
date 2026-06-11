@@ -25,6 +25,7 @@ services:
       ASPNETCORE_URLS: http://+:8081
       ConnectionStrings__Core: Host=postgres;Port=5432;Database=flit_dev;Username=flit;Password=flit_local
       Cors__AllowedOrigins: http://localhost:5173
+      Identity__Onboarding__ActivationBaseUrl: http://localhost:5173
     ports:
       - "3030:8081"
     depends_on:

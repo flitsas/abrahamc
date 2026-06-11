@@ -13,6 +13,7 @@ public static class FlitEnvFileLoader
         {
             ["CONNECTION_STRING_CORE"] = "ConnectionStrings__Core",
             ["CORS_ORIGIN"] = "Cors__AllowedOrigins",
+            ["FRONTEND_BASE_URL"] = "Identity__Onboarding__ActivationBaseUrl",
             ["SMTP_HOST"] = "Smtp__Host",
             ["SMTP_PORT"] = "Smtp__Port",
             ["SMTP_USER"] = "Smtp__User",

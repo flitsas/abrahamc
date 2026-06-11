@@ -9,7 +9,8 @@
 #
 # Variables requeridas en .env (junto al compose):
 #   CONNECTION_STRING_CORE  cadena Npgsql .NET (Host=...;Port=5432;Database=...;Username=...;Password=...)
-#   CORS_ORIGIN             origen permitido del frontend (https://abrahamc.flitsas.online)
+#   CORS_ORIGIN             origen permitido del frontend (https://dev.abrahamc.flitsas.online)
+#   FRONTEND_BASE_URL       URL pública del SPA (enlaces en correos: invitación, reset password)
 #   VERIFIK_API_TOKEN       token Verifik (RUNT)
 # Variables para AISLAR este proyecto del resto del VPS (UNICAS por proyecto):
 #   COMPOSE_PROJECT_NAME    nombre del proyecto Compose (default: flit-prod)
@@ -52,6 +53,7 @@ services:
       ASPNETCORE_URLS: http://+:8081
       ConnectionStrings__Core: ${CONNECTION_STRING_CORE}
       Cors__AllowedOrigins: ${CORS_ORIGIN:-https://dev.abrahamc.flitsas.online}
+      Identity__Onboarding__ActivationBaseUrl: ${FRONTEND_BASE_URL:-https://dev.abrahamc.flitsas.online}
       # Login deshabilitado temporalmente: DevGenerate evita exigir llaves JWT
       # montadas. Para reactivar login, montar jwt-private/public.pem y quitar esto.
       Jwt__DevGenerate: "true"
