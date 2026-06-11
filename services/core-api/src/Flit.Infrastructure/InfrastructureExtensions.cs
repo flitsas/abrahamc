@@ -176,6 +176,7 @@ public static class InfrastructureExtensions
 
         // ── Companies (#9444 / #9445) ─────────────────────────────────
         services.AddScoped<ICompaniesRepository, EfCompaniesRepository>();
+        services.AddScoped<ICompanyTenantProvisioner, IdentityCompanyTenantProvisioner>();
         services.AddScoped<ICompaniesIndexRepository, NpgsqlCompaniesIndexRepository>();
         services.AddScoped<ICompanyModuleConfigsRepository, EfCompanyModuleConfigsRepository>();
         services.AddScoped<IVehicleOwnershipRulesRepository, EfVehicleOwnershipRulesRepository>();

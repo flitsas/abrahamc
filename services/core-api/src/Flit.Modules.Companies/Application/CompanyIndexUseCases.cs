@@ -1,8 +1,47 @@
+using System.Text.RegularExpressions;
 using Flit.Modules.Companies.Domain;
 using Flit.Modules.Companies.Ports;
 using Flit.SharedKernel;
 
 namespace Flit.Modules.Companies.Application;
+
+internal static partial class CompanySlugHelper
+{
+    private static readonly Regex SlugRegex = new(
+        "^[a-z0-9]+(-[a-z0-9]+)*$",
+        RegexOptions.Compiled);
+
+    [GeneratedRegex(@"[^a-z0-9\s-]", RegexOptions.Compiled)]
+    private static partial Regex NonSlugChars();
+
+    [GeneratedRegex(@"\s+", RegexOptions.Compiled)]
+    private static partial Regex WhitespaceRuns();
+
+    public static bool IsValid(string slug) => SlugRegex.IsMatch(slug);
+
+    public static string FromLegalName(string legalName)
+    {
+        var normalized = legalName.Trim().ToLowerInvariant();
+        var slug = WhitespaceRuns().Replace(NonSlugChars().Replace(normalized, string.Empty), "-").Trim('-');
+        return string.IsNullOrWhiteSpace(slug) ? "company" : slug;
+    }
+
+    public static async Task<string> ResolveUniqueAsync(
+        string baseSlug,
+        Func<string, CancellationToken, Task<bool>> slugExists,
+        CancellationToken ct)
+    {
+        var candidate = baseSlug;
+        var suffix = 2;
+        while (await slugExists(candidate, ct))
+        {
+            candidate = $"{baseSlug}-{suffix}";
+            suffix++;
+        }
+
+        return candidate;
+    }
+}
 
 public static class ListCompaniesIndex
 {
@@ -22,6 +61,7 @@ public static class ListCompaniesIndex
         string Nit,
         string LegalName,
         string? CommercialName,
+        string Status,
         string ModulesEnabledJson,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt,
@@ -31,9 +71,9 @@ public static class ListCompaniesIndex
 
     public sealed record Response(
         IReadOnlyList<RowDto> Data,
-        int Total,
+        int TotalCount,
         int Page,
-        int Limit);
+        int PageSize);
 
     public static async Task<Response> HandleAsync(
         Query query,
@@ -63,6 +103,7 @@ public static class ListCompaniesIndex
         row.Nit,
         row.LegalName,
         row.CommercialName,
+        row.Status,
         row.ModulesEnabledJson,
         row.CreatedAt,
         row.UpdatedAt,
@@ -80,6 +121,7 @@ public static class GetCompanyIndex
         string Nit,
         string LegalName,
         string? CommercialName,
+        string Status,
         string ModulesEnabledJson,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt,
@@ -100,10 +142,135 @@ public static class GetCompanyIndex
                 row.Nit,
                 row.LegalName,
                 row.CommercialName,
+                row.Status,
                 row.ModulesEnabledJson,
                 row.CreatedAt,
                 row.UpdatedAt,
                 new ListCompaniesIndex.CompanyActionsDto(true, true));
+    }
+}
+
+/// <summary>HU #9687 — alta maestro B2B (tenant + companies.companies + billetera firmas).</summary>
+public static class CreateCompanyIndex
+{
+    public sealed record Command(
+        string Nit,
+        string LegalName,
+        string? CommercialName,
+        string? ContactEmail,
+        string? Slug,
+        string? ModulesEnabledJson,
+        Guid ActorUserId,
+        bool IsSuperAdmin);
+
+    public sealed record Response(
+        Guid Id,
+        Guid TenantId,
+        string Nit,
+        string LegalName,
+        string? CommercialName,
+        string Status,
+        string ModulesEnabledJson,
+        DateTimeOffset CreatedAt);
+
+    public static async Task<Result<Response, CompaniesError>> HandleAsync(
+        Command cmd,
+        ICompanyTenantProvisioner tenantProvisioner,
+        ICompaniesRepository companiesRepo,
+        Func<CancellationToken, Task<int>> saveChanges,
+        IClock clock,
+        CancellationToken ct = default)
+    {
+        if (!cmd.IsSuperAdmin)
+        {
+            return Result<Response, CompaniesError>.Failure(new CompaniesError(
+                CompaniesErrorCode.Forbidden,
+                "Solo SuperAdmin puede crear compañías maestro."));
+        }
+
+        if (string.IsNullOrWhiteSpace(cmd.Nit) || string.IsNullOrWhiteSpace(cmd.LegalName))
+        {
+            return Result<Response, CompaniesError>.Failure(new CompaniesError(
+                CompaniesErrorCode.InvalidInput,
+                "NIT y razón social son obligatorios."));
+        }
+
+        var nit = cmd.Nit.Trim();
+        if (await tenantProvisioner.NitExistsAsync(nit, ct) ||
+            await companiesRepo.ExistsByNitAsync(nit, ct))
+        {
+            return Result<Response, CompaniesError>.Failure(new CompaniesError(
+                CompaniesErrorCode.NitConflict,
+                "NIT ya registrado."));
+        }
+
+        var baseSlug = string.IsNullOrWhiteSpace(cmd.Slug)
+            ? CompanySlugHelper.FromLegalName(cmd.LegalName)
+            : cmd.Slug.Trim().ToLowerInvariant();
+
+        if (!CompanySlugHelper.IsValid(baseSlug))
+        {
+            return Result<Response, CompaniesError>.Failure(new CompaniesError(
+                CompaniesErrorCode.InvalidSlug,
+                "Slug inválido. Use solo minúsculas, números y guiones."));
+        }
+
+        var slug = await CompanySlugHelper.ResolveUniqueAsync(
+            baseSlug,
+            tenantProvisioner.SlugExistsAsync,
+            ct);
+
+        var settings = BuildTenantSettings(cmd.ContactEmail);
+        var tenant = await tenantProvisioner.CreateAsync(
+            cmd.LegalName.Trim(),
+            nit,
+            slug,
+            settings,
+            cmd.ActorUserId,
+            ct);
+
+        var modulesJson = string.IsNullOrWhiteSpace(cmd.ModulesEnabledJson)
+            ? "{}"
+            : cmd.ModulesEnabledJson;
+
+        var provision = await ProvisionCompanyProfile.ExecuteAsync(
+            companiesRepo,
+            saveChanges,
+            new ProvisionCompanyProfile.Request(
+                tenant.Id,
+                nit,
+                cmd.LegalName.Trim(),
+                cmd.CommercialName,
+                modulesJson,
+                cmd.ActorUserId),
+            clock.UtcNow,
+            ct);
+
+        if (!provision.IsSuccess)
+        {
+            return Result<Response, CompaniesError>.Failure(provision.Error);
+        }
+
+        return Result<Response, CompaniesError>.Success(new Response(
+            provision.Value.CompanyId,
+            tenant.Id,
+            nit,
+            cmd.LegalName.Trim(),
+            string.IsNullOrWhiteSpace(cmd.CommercialName) ? null : cmd.CommercialName.Trim(),
+            tenant.Status,
+            modulesJson,
+            clock.UtcNow));
+    }
+
+    private static string BuildTenantSettings(string? contactEmail)
+    {
+        if (string.IsNullOrWhiteSpace(contactEmail))
+            return "{}";
+
+        var escaped = contactEmail.Trim()
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal);
+        return $$"""{"contactEmail":"{{escaped}}"}""";
     }
 }
 

@@ -20,6 +20,11 @@ public sealed class EfCompaniesRepository : ICompaniesRepository
     public Task<bool> ExistsForTenantAsync(Guid tenantId, CancellationToken ct = default)
         => _db.Companies.AnyAsync(c => c.TenantId == tenantId, ct);
 
+    public Task<bool> ExistsByNitAsync(string nit, CancellationToken ct = default)
+        => _db.Companies.AnyAsync(
+            c => c.Nit == nit.Trim() && c.DeletedAt == null,
+            ct);
+
     public async Task AddAsync(Company company, CancellationToken ct = default)
         => await _db.Companies.AddAsync(company, ct);
 

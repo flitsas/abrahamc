@@ -46,7 +46,7 @@ public sealed class NpgsqlCompaniesIndexRepository(FlitDbContext db) : ICompanie
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             SELECT c.id, c.tenant_id, t.name, c.nit, c.legal_name, c.commercial_name,
-                   c.modules_enabled::text, c.created_at, c.updated_at
+                   t.status, c.modules_enabled::text, c.created_at, c.updated_at
             FROM companies.companies c
             INNER JOIN identity.tenants t ON t.id = c.tenant_id AND t.deleted_at IS NULL
             WHERE c.deleted_at IS NULL
@@ -94,7 +94,7 @@ public sealed class NpgsqlCompaniesIndexRepository(FlitDbContext db) : ICompanie
             ? "SELECT COUNT(*)::int"
             : """
               SELECT c.id, c.tenant_id, t.name, c.nit, c.legal_name, c.commercial_name,
-                     c.modules_enabled::text, c.created_at, c.updated_at
+                     t.status, c.modules_enabled::text, c.created_at, c.updated_at
               """;
 
         cmd.CommandText = $"""
@@ -149,6 +149,7 @@ public sealed class NpgsqlCompaniesIndexRepository(FlitDbContext db) : ICompanie
         reader.GetString(4),
         reader.IsDBNull(5) ? null : reader.GetString(5),
         reader.GetString(6),
-        reader.GetFieldValue<DateTimeOffset>(7),
-        reader.GetFieldValue<DateTimeOffset>(8));
+        reader.GetString(7),
+        reader.GetFieldValue<DateTimeOffset>(8),
+        reader.GetFieldValue<DateTimeOffset>(9));
 }

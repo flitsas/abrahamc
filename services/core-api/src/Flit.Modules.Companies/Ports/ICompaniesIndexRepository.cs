@@ -7,6 +7,7 @@ public sealed record CompanyIndexRow(
     string Nit,
     string LegalName,
     string? CommercialName,
+    string Status,
     string ModulesEnabledJson,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);

@@ -7,12 +7,20 @@ using Flit.SharedKernel;
 namespace Flit.Api.Endpoints;
 
 /// <summary>
-/// HU #9445 — Consola de indexación B2B (listar/filtrar, Ver, Editar).
-/// Requiere sesión JWT (cookies) y permiso <c>modulo.companias.crud-total</c>.
-/// Override opcional <c>X-Flit-Tenant-Id</c> para configs scoped a una compañía (SA).
+/// HU #9445 / #9687 — Consola indexación B2B SuperAdmin (listar, crear, editar).
+/// Permisos: <c>modulo.companias.ver</c> (GET), <c>modulo.companias.gestionar</c> (POST),
+/// <c>modulo.companias.crud-total</c> (configs/RUNT/ownership).
 /// </summary>
 public static class CompaniesEndpoints
 {
+    public sealed record CreateCompanyIndexRequest(
+        string Nit,
+        string LegalName,
+        string? CommercialName,
+        string? ContactEmail,
+        string? Slug,
+        string? ModulesEnabledJson);
+
     public sealed record UpdateCompanyIndexRequest(
         string LegalName,
         string? CommercialName,
@@ -41,11 +49,11 @@ public static class CompaniesEndpoints
 
     public static void MapCompaniesEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/v1/companies")
-            .WithTags("Companies")
-            .AddEndpointFilter(new TramitesPermissionFilter("modulo.companias.crud-total"));
+        var group = app.MapGroup("/api/v1/companies").WithTags("Companies");
 
-        var configs = group.MapGroup("/module-configs").WithTags("Companies - Module Config");
+        var configs = group.MapGroup("/module-configs")
+            .WithTags("Companies - Module Config")
+            .AddEndpointFilter(new TramitesPermissionFilter("modulo.companias.crud-total"));
 
         configs.MapGet("/", async (
             ICompanyModuleConfigsRepository repo,
@@ -140,9 +148,12 @@ public static class CompaniesEndpoints
                 new GetSignatureWallet.Query(tenantId.Value), repo, ct);
             return wallet is null ? Results.NotFound() : Results.Ok(wallet);
         })
+        .RequireTramitesPermission("modulo.companias.crud-total")
         .WithName("GetCompanySignatureWallet");
 
-        var runt = group.MapGroup("/runt").WithTags("Companies - RUNT Contingency");
+        var runt = group.MapGroup("/runt")
+            .WithTags("Companies - RUNT Contingency")
+            .AddEndpointFilter(new TramitesPermissionFilter("modulo.companias.crud-total"));
 
         runt.MapPost("/vehicle-lookup", async (
             VehicleLookupRequest req,
@@ -197,7 +208,9 @@ public static class CompaniesEndpoints
         })
         .WithName("RuntVehicleLookup");
 
-        var ownership = group.MapGroup("/vehicle-ownership-rules").WithTags("Companies - Vehicle Ownership");
+        var ownership = group.MapGroup("/vehicle-ownership-rules")
+            .WithTags("Companies - Vehicle Ownership")
+            .AddEndpointFilter(new TramitesPermissionFilter("modulo.companias.crud-total"));
 
         ownership.MapGet("/", async (
             IVehicleOwnershipRulesRepository repo,
@@ -327,7 +340,9 @@ public static class CompaniesEndpoints
 
         group.MapGet("/", async (
             int? page,
+            int? pageSize,
             int? limit,
+            string? search,
             string? id,
             string? nit,
             string? name,
@@ -353,20 +368,66 @@ public static class CompaniesEndpoints
                 companyId = parsedId;
             }
 
+            var unifiedSearch = search ?? name ?? nit;
             var response = await ListCompaniesIndex.HandleAsync(
                 new ListCompaniesIndex.Query(
                     page ?? 1,
-                    limit ?? 20,
+                    pageSize ?? limit ?? 20,
                     companyId,
-                    nit,
-                    name,
+                    nit: unifiedSearch,
+                    name: null,
                     createdFrom,
                     createdTo),
                 repo,
                 ct);
             return Results.Ok(response);
         })
+        .RequireTramitesPermission("modulo.companias.ver")
         .WithName("ListCompaniesIndex");
+
+        group.MapPost("/", async (
+            CreateCompanyIndexRequest req,
+            ICompanyTenantProvisioner tenantProvisioner,
+            ICompaniesRepository companiesRepo,
+            IUnitOfWork uow,
+            ICompaniesSessionContext session,
+            IClock clock,
+            CancellationToken ct) =>
+        {
+            var actorId = session.ActorUserId
+                ?? Guid.Parse("00000000-0000-7000-8000-000000000001");
+
+            var result = await CreateCompanyIndex.HandleAsync(
+                new CreateCompanyIndex.Command(
+                    req.Nit,
+                    req.LegalName,
+                    req.CommercialName,
+                    req.ContactEmail,
+                    req.Slug,
+                    req.ModulesEnabledJson,
+                    actorId,
+                    session.IsSuperAdmin),
+                tenantProvisioner,
+                companiesRepo,
+                ct => uow.SaveChangesAsync(ct),
+                clock,
+                ct);
+
+            return result.Match(
+                ok => Results.Created($"/api/v1/companies/{ok.Id}", ok),
+                err => err.Code switch
+                {
+                    CompaniesErrorCode.NitConflict => Results.Conflict(new { error = err.Message }),
+                    CompaniesErrorCode.Forbidden => Results.Json(
+                        new { error = err.Message },
+                        statusCode: StatusCodes.Status403Forbidden),
+                    CompaniesErrorCode.InvalidSlug or CompaniesErrorCode.InvalidInput =>
+                        Results.BadRequest(new { error = err.Message }),
+                    _ => Results.Problem(err.Message),
+                });
+        })
+        .RequireTramitesPermission("modulo.companias.gestionar")
+        .WithName("CreateCompanyIndex");
 
         group.MapGet("/{id:guid}", async (
             Guid id,
@@ -382,6 +443,7 @@ public static class CompaniesEndpoints
             var company = await GetCompanyIndex.HandleAsync(new GetCompanyIndex.Query(id), repo, ct);
             return company is null ? Results.NotFound() : Results.Ok(company);
         })
+        .RequireTramitesPermission("modulo.companias.ver")
         .WithName("GetCompanyIndex");
 
         group.MapPatch("/{id:guid}", async (
@@ -425,6 +487,7 @@ public static class CompaniesEndpoints
                     _ => Results.Problem(err.Message),
                 });
         })
+        .RequireTramitesPermission("modulo.companias.crud-total")
         .WithName("UpdateCompanyIndex");
     }
 
