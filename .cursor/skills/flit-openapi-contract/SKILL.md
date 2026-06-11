@@ -55,8 +55,13 @@ dotnet build src/Flit.Api/Flit.Api.csproj
 curl -s http://localhost:3030/openapi/v1.json | head
 ```
 
-La ruta canónica DEV: `http://localhost:3030/openapi/v1.json`  
-Alias redirect: `http://localhost:3030/swagger` → `/openapi/v1.json`
+Local: `http://localhost:3030/openapi/v1.json` (alias `/swagger` → redirect)
+
+DEV desplegado (vía gateway YARP + nginx frontend):
+- `https://dev.api.abrahamc.flitsas.online/openapi/v1.json`
+- `https://dev.abrahamc.flitsas.online/openapi/v1.json` (recomendado para QA — mismo origen que el SPA)
+
+**No usar** `dev.core.abrahamc.flitsas.online` — no tiene registro DNS; core-api es interno al compose.
 
 ### Paso 4 — Comentario en ADO (HU)
 

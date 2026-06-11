@@ -5,7 +5,10 @@
 # publicados en 127.0.0.1:
 #   dev.abrahamc.flitsas.online      -> frontend  (127.0.0.1:40105)
 #   dev.api.abrahamc.flitsas.online   -> gateway   (127.0.0.1:40205)  [API publica YARP]
-#   dev.core.abrahamc.flitsas.online  -> core-api (127.0.0.1:40305)  [Flit.Api interno/debug]
+#   dev.core.abrahamc.flitsas.online  -> core-api (127.0.0.1:40305)  [opcional/debug; sin DNS hoy]
+#   OpenAPI/Swagger público en DEV:
+#     https://dev.api.abrahamc.flitsas.online/openapi/v1.json
+#     https://dev.abrahamc.flitsas.online/openapi/v1.json  (mismo origen que el SPA)
 #
 # Variables requeridas en .env (junto al compose):
 #   CONNECTION_STRING_CORE  cadena Npgsql .NET (Host=...;Port=5432;Database=...;Username=...;Password=...)
