@@ -69,7 +69,8 @@ Lee antes de escribir cualquier línea de código:
 - Documento de diseño en `docs/designs/` si existe
 - ADRs relevantes en `docs/decisions/`
 - `docs/database-conventions.md` y `docs/data-access-conventions.md` — persistencia y repositorios
-- `docs/openapi.yaml` — contratos vigentes
+- `docs/openapi.yaml` — contratos vigentes (actualizar con `@flit-openapi-contract`)
+- `.cursor/skills/flit-openapi-contract/SKILL.md` — flujo Swagger/OpenAPI obligatorio
 
 ---
 
@@ -107,7 +108,7 @@ Lee antes de escribir cualquier línea de código:
 4. **Migraciones EF Core:** `dotnet ef migrations add <Nombre>` — idempotentes, nunca modifica migraciones ya aplicadas. Si el SQL va embebido, **nunca** dejes solo el `.cs`: el par `.Designer.cs` es obligatorio (ver `.cursor/rules/ef-migrations.mdc`). Valida con `pnpm run validate:ef-migrations` antes de push.
 5. **Manejo de errores:** excepciones de dominio mapeadas a HTTP status en middleware global.
 6. **Logging:** Serilog con `request_id`, sin secretos ni PII en los logs.
-7. **Actualiza `docs/openapi.yaml`** si el PR agrega o modifica contratos.
+7. **Contrato OpenAPI (obligatorio si hay endpoints):** invoca `@flit-openapi-contract` — actualiza `docs/openapi.yaml`, verifica `AddOpenApi`/`MapOpenApi` en `Program.cs`, y publica tabla de endpoints en comentario ADO de la HU.
 8. **Ejecuta la skill `@dev-tester` completa (PASO 1→7)** — inmediatamente tras el código.
 9. **Git (opcional, con confirmación del usuario):** propón rama y commit; no ejecutes sin aprobación.
 10. **Delegar PR e integración ADO** vía `integration-agent`.

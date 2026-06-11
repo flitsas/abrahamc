@@ -1,0 +1,722 @@
+openapi: 3.1.0
+info:
+  title: FLIT Core API
+  version: v1
+  description: |
+    Contrato REST canónico de `core-api` (Trámites 2.0).
+    Spec en runtime (auto-generada desde Minimal APIs): `GET /openapi/v1.json`
+    Features documentadas en esta versión: #9549 (Identidad) y #9550 (Compañías).
+
+servers:
+  - url: http://localhost:3030
+    description: DEV local
+  - url: https://dev.flit.com.co
+    description: DEV VPS (ajustar según despliegue)
+
+tags:
+  - name: Authentication
+    description: Feature #9549 — HU #9683, #9685
+  - name: Identity - Onboarding
+    description: Feature #9549 — HU #9684, #9685
+  - name: Identity - Users
+    description: Feature #9549 — HU #9684
+  - name: Identity - Admin Console
+    description: Feature #9549 — HU #9686
+  - name: Identity - Profile
+    description: Feature #9549 — HU #9686
+  - name: RBAC - Permissions
+    description: Feature #9549 — HU #9683, #9684
+  - name: Companies
+    description: Feature #9550 — HU #9687
+  - name: Companies - Module Config
+    description: Feature #9550 — HU #9688
+  - name: Companies - Tenant Governance
+    description: Feature #9550 — HU #9689
+  - name: Companies - Vehicle Ownership
+    description: Feature #9550 — HU #9689
+  - name: Companies - RUNT Contingency
+    description: Feature #9550 — HU #9690
+  - name: RUNT
+    description: Feature #9550 — HU #9690
+
+paths:
+  /api/v1/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login JWT (HU #9683)
+      operationId: TramitesLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200":
+          description: Tokens y sesión con roles/permisos aditivos
+        "401":
+          description: Credenciales inválidas
+        "423":
+          description: Cuenta temporalmente bloqueada
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Renovar access token (HU #9683)
+      operationId: TramitesRefresh
+      security: []
+      responses:
+        "200":
+          description: Nuevo par de tokens
+        "401":
+          description: Refresh inválido o revocado
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Cerrar sesión (HU #9683)
+      operationId: TramitesLogout
+      responses:
+        "204":
+          description: Sesión cerrada
+
+  /api/v1/auth/me:
+    get:
+      tags: [Authentication]
+      summary: Sesión actual y permisos efectivos (HU #9683)
+      operationId: TramitesAuthMe
+      responses:
+        "200":
+          description: Usuario, roleSlugs, permissionSlugs, permissionsEpoch
+        "401":
+          description: No autenticado
+
+  /api/v1/auth/password-reset/request:
+    post:
+      tags: [Authentication]
+      summary: Solicitar restablecimiento de contraseña (HU #9685)
+      operationId: TramitesPasswordResetRequest
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "200":
+          description: Respuesta genérica (no revela si el email existe)
+
+  /api/v1/auth/password-reset/confirm:
+    post:
+      tags: [Authentication]
+      summary: Confirmar nueva contraseña (HU #9685)
+      operationId: TramitesPasswordResetConfirm
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resetToken, newPassword]
+              properties:
+                resetToken: { type: string }
+                newPassword: { type: string }
+      responses:
+        "200":
+          description: Contraseña actualizada
+        "400":
+          description: Token inválido o política no cumplida
+
+  /api/v1/permissions/me:
+    get:
+      tags: [RBAC - Permissions]
+      summary: Slugs de permisos del usuario autenticado (HU #9683)
+      operationId: TramitesPermissionsMe
+      responses:
+        "200":
+          description: Lista de slugs efectivos
+
+  /api/v1/users/invite:
+    post:
+      tags: [Identity - Users]
+      summary: Invitar usuario al tenant (HU #9684)
+      operationId: TramitesInviteUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, invitedRoleId]
+              properties:
+                email: { type: string, format: email }
+                invitedRoleId: { type: string, format: uuid }
+                tenantId: { type: string, format: uuid }
+      responses:
+        "201":
+          description: Invitación creada y correo encolado
+        "403":
+          description: Sin permiso modulo.identidad.gestionar-usuarios
+
+  /api/v1/identity/onboarding/invitations:
+    post:
+      tags: [Identity - Onboarding]
+      summary: Crear invitación firmada (HU #9684)
+      operationId: TramitesCreateOnboardingInvitation
+      responses:
+        "201":
+          description: Invitación con activationUrl
+
+  /api/v1/identity/onboarding/preview:
+    get:
+      tags: [Identity - Onboarding]
+      summary: Previsualizar invitación (HU #9684, #9685)
+      operationId: TramitesPreviewOnboardingInvitation
+      security: []
+      parameters:
+        - name: invitationId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: token
+          in: query
+          required: true
+          schema: { type: string }
+        - name: signature
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Email, tenantId, política de contraseña
+
+  /api/v1/identity/onboarding/activate:
+    post:
+      tags: [Identity - Onboarding]
+      summary: Activar cuenta por invitación (HU #9684, #9685)
+      operationId: TramitesActivateOnboardingAccount
+      security: []
+      responses:
+        "200":
+          description: Cuenta activada
+
+  /api/v1/identity/onboarding/password-policy:
+    get:
+      tags: [Identity - Onboarding]
+      summary: Política de contraseña del tenant (HU #9684)
+      operationId: TramitesOnboardingPasswordPolicy
+      security: []
+      parameters:
+        - name: tenantId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Reglas de complejidad
+
+  /api/v1/identity/onboarding/global-settings:
+    get:
+      tags: [Identity - Onboarding]
+      summary: TTL global de tokens e invitaciones (HU #9684)
+      operationId: TramitesOnboardingGlobalSettings
+      security: []
+      responses:
+        "200":
+          description: invitationTtlMinutes, passwordResetTtlMinutes, etc.
+
+  /api/v1/identity/permissions:
+    get:
+      tags: [RBAC - Permissions]
+      summary: Catálogo de permisos (SuperAdmin) (HU #9684)
+      operationId: TramitesListPermissions
+      responses:
+        "200":
+          description: Lista de permisos
+    post:
+      tags: [RBAC - Permissions]
+      summary: Crear permiso slug (SuperAdmin) (HU #9684)
+      operationId: TramitesCreatePermission
+      responses:
+        "201":
+          description: Permiso creado
+
+  /api/v1/identity/permissions/{id}/active:
+    patch:
+      tags: [RBAC - Permissions]
+      summary: Activar/desactivar permiso (HU #9684)
+      operationId: TramitesSetPermissionActive
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Estado actualizado
+
+  /api/v1/identity/admin/users:
+    get:
+      tags: [Identity - Admin Console]
+      summary: Listar colaboradores (HU #9686)
+      operationId: TramitesAdminListUsers
+      parameters:
+        - name: tenantId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Grilla paginada
+    post:
+      tags: [Identity - Admin Console]
+      summary: Crear colaborador (HU #9686)
+      operationId: TramitesAdminCreateUser
+      responses:
+        "201":
+          description: Usuario creado
+
+  /api/v1/identity/admin/users/{id}:
+    get:
+      tags: [Identity - Admin Console]
+      summary: Detalle colaborador (HU #9686)
+      operationId: TramitesAdminGetUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Detalle
+    patch:
+      tags: [Identity - Admin Console]
+      summary: Actualizar colaborador (HU #9686)
+      operationId: TramitesAdminUpdateUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Actualizado (incrementa permissions_epoch si cambian roles)
+
+  /api/v1/identity/admin/users/{userId}/roles/{roleId}:
+    put:
+      tags: [Identity - Admin Console]
+      summary: Asignar rol (HU #9686)
+      operationId: TramitesAdminAssignRole
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: roleId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Rol asignado
+    delete:
+      tags: [Identity - Admin Console]
+      summary: Quitar rol (HU #9686)
+      operationId: TramitesAdminRemoveRole
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: roleId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Rol removido
+
+  /api/v1/identity/admin/roles:
+    get:
+      tags: [Identity - Admin Console]
+      summary: Roles asignables (HU #9686)
+      operationId: TramitesAdminListRoles
+      responses:
+        "200":
+          description: Lista de roles
+
+  /api/v1/identity/me/profile:
+    get:
+      tags: [Identity - Profile]
+      summary: Perfil del usuario autenticado (HU #9686)
+      operationId: TramitesGetMyProfile
+      responses:
+        "200":
+          description: Perfil
+    patch:
+      tags: [Identity - Profile]
+      summary: Actualizar perfil (HU #9686)
+      operationId: TramitesUpdateMyProfile
+      responses:
+        "200":
+          description: Perfil actualizado
+
+  /api/v1/identity/me/change-password:
+    post:
+      tags: [Identity - Profile]
+      summary: Cambio de contraseña autenticado (HU #9686)
+      operationId: TramitesChangePassword
+      responses:
+        "200":
+          description: Contraseña cambiada
+
+  /api/v1/companies:
+    get:
+      tags: [Companies]
+      summary: Indexación SuperAdmin / tenant (HU #9687)
+      operationId: ListCompaniesIndex
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: id
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Lista paginada B2B
+    post:
+      tags: [Companies]
+      summary: Alta maestro compañía + tenant (HU #9687)
+      operationId: CreateCompanyIndex
+      responses:
+        "201":
+          description: Compañía creada
+
+  /api/v1/companies/{id}:
+    get:
+      tags: [Companies]
+      summary: Detalle compañía (HU #9687)
+      operationId: GetCompanyIndex
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Detalle
+    patch:
+      tags: [Companies]
+      summary: Actualizar maestro compañía (HU #9687)
+      operationId: UpdateCompanyIndex
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Actualizado
+
+  /api/v1/companies/module-configs:
+    get:
+      tags: [Companies - Module Config]
+      summary: Listar configs del tenant en sesión (HU #9688)
+      operationId: ListCompanyModuleConfigs
+      responses:
+        "200":
+          description: Configs por module_key
+
+  /api/v1/companies/module-configs/{moduleKey}:
+    get:
+      tags: [Companies - Module Config]
+      summary: Obtener config módulo (HU #9688)
+      operationId: GetCompanyModuleConfig
+      parameters:
+        - name: moduleKey
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Config JSON validado
+    put:
+      tags: [Companies - Module Config]
+      summary: Upsert config módulo (HU #9688)
+      operationId: UpsertCompanyModuleConfig
+      parameters:
+        - name: moduleKey
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Config guardada
+
+  /api/v1/companies/{tenantId}/module-configs:
+    get:
+      tags: [Companies - Module Config]
+      summary: Listar configs por tenantId (SuperAdmin) (HU #9688)
+      operationId: ListCompanyModuleConfigsByTenant
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Configs del tenant
+
+  /api/v1/companies/{tenantId}/module-configs/{moduleKey}:
+    get:
+      tags: [Companies - Module Config]
+      summary: Obtener config por tenant (HU #9688)
+      operationId: GetCompanyModuleConfigByTenant
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: moduleKey
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Config
+    put:
+      tags: [Companies - Module Config]
+      summary: Upsert config por tenant (HU #9688)
+      operationId: UpsertCompanyModuleConfigByTenant
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: moduleKey
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Config guardada
+
+  /api/v1/companies/signature-wallet:
+    get:
+      tags: [Companies - Module Config]
+      summary: Billetera de firmas del tenant (HU #9688)
+      operationId: GetCompanySignatureWallet
+      responses:
+        "200":
+          description: Saldo y movimientos
+
+  /api/v1/companies/{tenantId}/vehicle-exceptions:
+    get:
+      tags: [Companies - Tenant Governance]
+      summary: Listar excepciones vehiculares (HU #9689)
+      operationId: ListTenantUserExceptions
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Excepciones activas
+    post:
+      tags: [Companies - Tenant Governance]
+      summary: Crear excepción vehicular (HU #9689)
+      operationId: CreateTenantUserException
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "201":
+          description: Excepción creada
+
+  /api/v1/companies/{tenantId}/vehicle-exceptions/{exceptionId}:
+    delete:
+      tags: [Companies - Tenant Governance]
+      summary: Revocar excepción (HU #9689)
+      operationId: DeleteTenantUserException
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: exceptionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Revocada
+
+  /api/v1/companies/{tenantId}/authorized-traffic-agencies:
+    get:
+      tags: [Companies - Tenant Governance]
+      summary: Matriz OT autorizados (HU #9689)
+      operationId: ListAuthorizedTrafficAgencies
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OT habilitados por tenant
+    put:
+      tags: [Companies - Tenant Governance]
+      summary: Habilitar/deshabilitar OT (HU #9689)
+      operationId: UpsertAuthorizedTrafficAgency
+      parameters:
+        - name: tenantId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Matriz actualizada
+
+  /api/v1/companies/vehicle-access/check:
+    post:
+      tags: [Companies - Tenant Governance]
+      summary: Validar pertenencia vehículo-tenant (HU #9689)
+      operationId: CheckVehicleTenantAccess
+      responses:
+        "200":
+          description: Acceso permitido
+        "403":
+          description: Vehículo no pertenece al tenant
+
+  /api/v1/companies/traffic-agencies/{trafficAgencyId}/authorize-check:
+    post:
+      tags: [Companies - Tenant Governance]
+      summary: Validar OT autorizado para tenant (HU #9689)
+      operationId: CheckTrafficAgencyAuthorization
+      parameters:
+        - name: trafficAgencyId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OT autorizado
+        "403":
+          description: OT no autorizado
+
+  /api/v1/companies/vehicle-ownership-rules:
+    get:
+      tags: [Companies - Vehicle Ownership]
+      summary: Listar reglas interceptor (HU #9689)
+      operationId: ListVehicleOwnershipRules
+      responses:
+        "200":
+          description: Reglas ordenadas por prioridad
+    post:
+      tags: [Companies - Vehicle Ownership]
+      summary: Crear regla interceptor (HU #9689)
+      operationId: CreateVehicleOwnershipRule
+      responses:
+        "201":
+          description: Regla creada
+
+  /api/v1/companies/vehicle-ownership-rules/{id}:
+    put:
+      tags: [Companies - Vehicle Ownership]
+      summary: Actualizar regla (HU #9689)
+      operationId: UpdateVehicleOwnershipRule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Regla actualizada
+
+  /api/v1/companies/vehicle-ownership-rules/evaluate:
+    post:
+      tags: [Companies - Vehicle Ownership]
+      summary: Evaluar interceptor vehicular (HU #9689)
+      operationId: EvaluateVehicleOwnershipInterceptor
+      responses:
+        "200":
+          description: Evaluación permitida
+        "422":
+          description: Bloqueo por regla de negocio
+
+  /api/v1/runt/vehicles/{plate}:
+    get:
+      tags: [RUNT]
+      summary: Consulta vehicular RUNT con failover (HU #9690)
+      operationId: GetRuntVehicleByPlate
+      parameters:
+        - name: plate
+          in: path
+          required: true
+          schema: { type: string }
+        - name: simulateRuntUnavailable
+          in: query
+          schema: { type: boolean, default: false }
+        - name: simulateAllProvidersDown
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Datos vehículo + proveedor usado
+        "404":
+          description: Vehículo no encontrado
+        "503":
+          description: RUNT_UNAVAILABLE — todos los proveedores caídos
+
+  /api/v1/companies/runt/vehicle-lookup:
+    post:
+      tags: [Companies - RUNT Contingency]
+      summary: Lookup RUNT desde consola compañías (HU #9690)
+      operationId: RuntVehicleLookup
+      responses:
+        "200":
+          description: Resultado consulta con bitácora
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: flit_access
+
+security:
+  - bearerAuth: []
+  - sessionCookie: []

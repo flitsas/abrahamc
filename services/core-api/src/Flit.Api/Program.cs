@@ -337,6 +337,21 @@ builder.Services.ConfigureHttpJsonOptions(opts =>
     opts.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
 });
 
+builder.Services.AddOpenApi("v1", options =>
+{
+    options.AddDocumentTransformer((document, _, _) =>
+    {
+        document.Info = new()
+        {
+            Title = "FLIT Core API",
+            Version = "v1",
+            Description =
+                "Contrato REST core-api (Trámites 2.0). Spec canónica versionada: docs/openapi.yaml",
+        };
+        return Task.CompletedTask;
+    });
+});
+
 var app = builder.Build();
 
 if (!string.IsNullOrEmpty(coreConnStr))
@@ -393,6 +408,10 @@ app.MapGet("/api/v1/health", () => new HealthResponse(
 ))
 .WithName("Health")
 .WithTags("System");
+
+app.MapOpenApi();
+app.MapGet("/swagger", () => Results.Redirect("/openapi/v1.json"))
+    .ExcludeFromDescription();
 
 app.MapGet("/", () => Results.Redirect("/api/v1/health"));
 
