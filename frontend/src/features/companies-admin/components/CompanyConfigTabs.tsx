@@ -35,9 +35,9 @@ export function CompanyConfigTabs({
   const tabsId = useId();
   const [editOpen, setEditOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ConfigTabId>("matricula");
-  const [dirtyTabs, setDirtyTabs] = useState<Partial<Record<ConfigTabId, boolean>>>(
-    {},
-  );
+  const [dirtyTabs, setDirtyTabs] = useState<
+    Partial<Record<ConfigTabId, boolean>>
+  >({});
   const [activeEmpresaSubTab, setActiveEmpresaSubTab] =
     useState<EmpresaSubTabId>("general");
   const [empresaGeneralDirty, setEmpresaGeneralDirty] = useState(false);
@@ -263,10 +263,7 @@ export function CompanyConfigTabs({
             )}
 
             {activeEmpresaSubTab === "excepciones" && (
-              <VehicleExceptionsSection
-                tenantId={company.tenantId}
-                embedded
-              />
+              <VehicleExceptionsSection tenantId={company.tenantId} embedded />
             )}
           </div>
         )}

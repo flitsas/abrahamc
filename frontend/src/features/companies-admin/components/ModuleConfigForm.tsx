@@ -71,8 +71,7 @@ export function ModuleConfigForm({
     setParseError(null);
   }, [configQuery.data, configQuery.isLoading, tenantId, moduleKey]);
 
-  const isDirty =
-    configJson !== savedSnapshot || isActive !== savedActive;
+  const isDirty = configJson !== savedSnapshot || isActive !== savedActive;
 
   useEffect(() => {
     onDirtyChange(isDirty);
@@ -132,7 +131,10 @@ export function ModuleConfigForm({
 
   if (configQuery.isError) {
     return (
-      <ErrorState error={configQuery.error} onRetry={() => configQuery.refetch()} />
+      <ErrorState
+        error={configQuery.error}
+        onRetry={() => configQuery.refetch()}
+      />
     );
   }
 
@@ -146,7 +148,9 @@ export function ModuleConfigForm({
         }
       >
         {!embedded && (
-          <h3 className="text-base font-semibold text-flit-blueDark">{label}</h3>
+          <h3 className="text-base font-semibold text-flit-blueDark">
+            {label}
+          </h3>
         )}
         <label className="flex items-center gap-2 text-sm text-flit-blueDark">
           <input
@@ -246,11 +250,7 @@ export function ModuleConfigForm({
         <GradientButton
           type="submit"
           className="!h-11 !w-auto !px-8 !text-sm"
-          disabled={
-            !isDirty ||
-            Boolean(parseError) ||
-            saveMutation.isPending
-          }
+          disabled={!isDirty || Boolean(parseError) || saveMutation.isPending}
         >
           {saveMutation.isPending ? "Guardando…" : "Guardar configuración"}
         </GradientButton>

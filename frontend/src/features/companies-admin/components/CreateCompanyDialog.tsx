@@ -66,8 +66,8 @@ export function CreateCompanyDialog({
           Nueva compañía B2B
         </h2>
         <p className="mt-2 text-sm text-flit-draft">
-          Se creará el tenant, el registro maestro y la billetera de firmas.
-          El slug se genera automáticamente desde la razón social.
+          Se creará el tenant, el registro maestro y la billetera de firmas. El
+          slug se genera automáticamente desde la razón social.
         </p>
 
         <form className="mt-6 space-y-4" onSubmit={handleSubmit} noValidate>

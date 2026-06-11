@@ -17,8 +17,13 @@ export function CompaniesAdminPage() {
   const canManageCompanies = usePermission(PERMISSIONS.manageCompanies);
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
-  const debouncedSearch = useDebouncedValue(searchInput.trim(), SEARCH_DEBOUNCE_MS);
-  const [selectedCompany, setSelectedCompany] = useState<CompanyRow | null>(null);
+  const debouncedSearch = useDebouncedValue(
+    searchInput.trim(),
+    SEARCH_DEBOUNCE_MS,
+  );
+  const [selectedCompany, setSelectedCompany] = useState<CompanyRow | null>(
+    null,
+  );
   const [createOpen, setCreateOpen] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 

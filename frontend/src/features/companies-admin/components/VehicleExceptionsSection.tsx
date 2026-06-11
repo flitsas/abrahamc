@@ -99,7 +99,8 @@ export function VehicleExceptionsSection({
             Excepciones vehiculares
           </h3>
           <p className="mt-1 text-sm text-flit-muted">
-            Lista blanca de usuarios autorizados para operar vehículos de terceros.
+            Lista blanca de usuarios autorizados para operar vehículos de
+            terceros.
           </p>
         </div>
       )}

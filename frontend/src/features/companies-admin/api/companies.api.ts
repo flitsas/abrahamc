@@ -185,10 +185,7 @@ export function useUpdateCompany(companyId: string) {
   });
 }
 
-export function useCompaniesList(
-  params: ListCompaniesParams,
-  enabled = true,
-) {
+export function useCompaniesList(params: ListCompaniesParams, enabled = true) {
   return useQuery({
     queryKey: queryKeys.companiesAdmin.list(params),
     queryFn: () => fetchCompanies(params),
@@ -212,7 +209,10 @@ export function useCompanyModuleConfig(
   });
 }
 
-export function useUpsertModuleConfig(tenantId: string, moduleKey: CompanyModuleKey) {
+export function useUpsertModuleConfig(
+  tenantId: string,
+  moduleKey: CompanyModuleKey,
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -226,7 +226,10 @@ export function useUpsertModuleConfig(tenantId: string, moduleKey: CompanyModule
   });
 }
 
-export function useVehicleExceptions(tenantId: string | undefined, enabled = true) {
+export function useVehicleExceptions(
+  tenantId: string | undefined,
+  enabled = true,
+) {
   return useQuery({
     queryKey: tenantId
       ? queryKeys.companiesAdmin.vehicleExceptions(tenantId)
