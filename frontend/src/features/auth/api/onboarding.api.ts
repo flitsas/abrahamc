@@ -5,6 +5,7 @@ import {
   activateAccountRequestSchema,
   activateAccountResponseSchema,
   invitationPreviewSchema,
+  onboardingTokenSettingsSchema,
   type ActivateAccountRequest,
 } from "./onboarding.schemas.js";
 
@@ -13,6 +14,11 @@ export type InvitationQueryParams = {
   token: string;
   signature: string;
 };
+
+export async function fetchOnboardingGlobalSettings() {
+  const { data } = await apiClient.get("/identity/onboarding/global-settings");
+  return onboardingTokenSettingsSchema.parse(data);
+}
 
 export async function previewInvitation(params: InvitationQueryParams) {
   const { data } = await apiClient.get("/identity/onboarding/preview", {
@@ -28,6 +34,15 @@ export async function activateAccount(request: ActivateAccountRequest) {
     payload,
   );
   return activateAccountResponseSchema.parse(data);
+}
+
+export function useOnboardingGlobalSettings(enabled = true) {
+  return useQuery({
+    queryKey: ["identity", "onboarding", "global-settings"],
+    queryFn: fetchOnboardingGlobalSettings,
+    enabled,
+    staleTime: 60_000,
+  });
 }
 
 export function useInvitationPreview(

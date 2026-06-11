@@ -39,6 +39,24 @@ public static class TramitesOnboardingToken
             Encoding.UTF8.GetBytes(providedSignature.Trim().ToLowerInvariant()));
     }
 
+    /// <summary>Compara la firma persistida en BD con la del enlace (evita drift de timestamptz).</summary>
+    public static bool VerifyStoredSignature(string storedSignature, string providedSignature)
+    {
+        if (string.IsNullOrWhiteSpace(storedSignature) || string.IsNullOrWhiteSpace(providedSignature))
+            return false;
+
+        return CryptographicOperations.FixedTimeEquals(
+            Encoding.UTF8.GetBytes(storedSignature.Trim().ToLowerInvariant()),
+            Encoding.UTF8.GetBytes(providedSignature.Trim().ToLowerInvariant()));
+    }
+
+    /// <summary>PostgreSQL timestamptz tiene precisión de microsegundos; normalizar antes de firmar.</summary>
+    public static DateTimeOffset NormalizeExpiresAtForStorage(DateTimeOffset value)
+    {
+        var roundedTicks = (long)Math.Round(value.UtcTicks / 10.0) * 10;
+        return new DateTimeOffset(roundedTicks, TimeSpan.Zero);
+    }
+
     public static string BuildActivationUrl(
         string baseUrl,
         Guid invitationId,

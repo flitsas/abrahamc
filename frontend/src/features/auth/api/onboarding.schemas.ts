@@ -29,7 +29,17 @@ export const activateAccountResponseSchema = z.object({
   message: z.string(),
 });
 
+export const onboardingTokenSettingsSchema = z.object({
+  invitationTtlMinutes: z.number().int().positive(),
+  passwordResetTtlMinutes: z.number().int().positive(),
+  accessTokenTtlMinutes: z.number().int().positive(),
+  refreshTokenTtlDays: z.number().int().positive(),
+});
+
 export type PasswordPolicy = z.infer<typeof passwordPolicySchema>;
+export type OnboardingTokenSettings = z.infer<
+  typeof onboardingTokenSettingsSchema
+>;
 export type InvitationPreview = z.infer<typeof invitationPreviewSchema>;
 export type ActivateAccountRequest = z.infer<
   typeof activateAccountRequestSchema

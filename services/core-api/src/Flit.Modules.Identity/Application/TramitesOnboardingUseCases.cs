@@ -4,7 +4,7 @@ using Flit.SharedKernel;
 
 namespace Flit.Modules.Identity.Application;
 
-/// <summary>Invitaciones firmadas 24h y activación de cuenta (HU #9418).</summary>
+/// <summary>Invitaciones firmadas y activación de cuenta (HU #9684).</summary>
 public static class TramitesOnboardingUseCases
 {
     public const string InvitationExpiredCode = "INVITATION_EXPIRED";
@@ -13,8 +13,6 @@ public static class TramitesOnboardingUseCases
     public const string EmailExistsCode = "EMAIL_ALREADY_REGISTERED";
     public const string RoleNotFoundCode = "ROLE_NOT_FOUND";
     public const string ForbiddenTenantCode = "TENANT_MISMATCH";
-
-    public static readonly TimeSpan InvitationTtl = TimeSpan.FromHours(72);
 
     public sealed record CreateInvitationCommand(
         string Email,
@@ -54,6 +52,7 @@ public static class TramitesOnboardingUseCases
         bool actorIsSuperAdmin,
         Guid actorUserId,
         IIdentityOnboardingRepository onboarding,
+        IGlobalAuthSettingsReader authSettings,
         byte[] signingKey,
         string activationBaseUrl,
         IOnboardingEmailNotifier? notifier,
@@ -80,10 +79,12 @@ public static class TramitesOnboardingUseCases
         _ = await onboarding.FindInactiveUserIdByEmailAsync(tenantId, email, ct)
             ?? await onboarding.CreateInactiveUserAsync(tenantId, email, actorUserId, ct);
 
+        var tokenSettings = await authSettings.GetAsync(ct);
         var invitationId = Guid.CreateVersion7();
         var token = TramitesOnboardingToken.GenerateToken();
         var tokenHash = TramitesOnboardingToken.HashToken(token);
-        var expiresAt = clock.UtcNow.Add(InvitationTtl);
+        var expiresAt = TramitesOnboardingToken.NormalizeExpiresAtForStorage(
+            clock.UtcNow.Add(tokenSettings.InvitationTtl));
         var signature = TramitesOnboardingToken.ComputeSignature(
             invitationId, token, expiresAt, signingKey);
 
@@ -188,7 +189,8 @@ public static class TramitesOnboardingUseCases
         if (row is null || row.Id != query.InvitationId)
             return Result<ResolvedInvitation, string>.Failure(InvitationInvalidCode);
 
-        if (!TramitesOnboardingToken.VerifySignature(
+        if (!TramitesOnboardingToken.VerifyStoredSignature(row.Signature, query.Signature)
+            && !TramitesOnboardingToken.VerifySignature(
                 row.Id, query.Token, row.ExpiresAt, query.Signature, signingKey))
             return Result<ResolvedInvitation, string>.Failure(InvitationInvalidCode);
 

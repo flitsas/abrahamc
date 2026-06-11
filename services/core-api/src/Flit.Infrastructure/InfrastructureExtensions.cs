@@ -85,6 +85,8 @@ public static class InfrastructureExtensions
             Flit.Modules.Identity.Application.TramitesPermissionVerifier>();
         services.AddScoped<Flit.Modules.Identity.Ports.IIdentityOnboardingRepository,
             NpgsqlIdentityOnboardingRepository>();
+        services.AddScoped<Flit.Modules.Identity.Ports.IGlobalAuthSettingsReader,
+            NpgsqlGlobalAuthSettingsReader>();
         services.AddScoped<Flit.Modules.Identity.Ports.IIdentityPasswordResetRepository,
             NpgsqlIdentityPasswordResetRepository>();
         services.AddScoped<Flit.Modules.Identity.Ports.IIdentityAdminRepository,

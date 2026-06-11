@@ -1,8 +1,10 @@
 import { useEffect, useId, useState } from "react";
 import type { AssignableRole } from "../api/admin.schemas.js";
+import { useOnboardingGlobalSettings } from "../../auth/api/onboarding.api.js";
 import { useInviteUser } from "../api/admin.api.js";
 import { GradientButton } from "../../../shared/components/flit/GradientButton.js";
 import { TextField } from "../../../shared/components/flit/TextField.js";
+import { formatDurationMinutes } from "../../../shared/lib/formatDurationMinutes.js";
 
 type InviteUserDialogProps = {
   open: boolean;
@@ -23,6 +25,10 @@ export function InviteUserDialog({
 }: InviteUserDialogProps) {
   const titleId = useId();
   const invite = useInviteUser();
+  const tokenSettings = useOnboardingGlobalSettings(open);
+  const invitationTtlLabel = tokenSettings.data
+    ? formatDurationMinutes(tokenSettings.data.invitationTtlMinutes)
+    : "1 hora";
   const [email, setEmail] = useState("");
   const [roleId, setRoleId] = useState("");
 
@@ -69,7 +75,8 @@ export function InviteUserDialog({
           Invitar usuario
         </h2>
         <p className="mt-2 text-sm text-flit-draft">
-          Se enviará un correo con enlace de activación (válido 72 horas).
+          Se enviará un correo con enlace de activación (válido{" "}
+          {invitationTtlLabel}).
         </p>
 
         <form className="mt-6 space-y-4" onSubmit={handleSubmit} noValidate>

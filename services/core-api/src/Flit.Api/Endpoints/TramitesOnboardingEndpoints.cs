@@ -34,6 +34,7 @@ public static class TramitesOnboardingEndpoints
             ITenantContext tenant,
             ITokenIssuer tokenIssuer,
             IIdentityOnboardingRepository onboarding,
+            IGlobalAuthSettingsReader authSettings,
             IConfiguration config,
             IOnboardingEmailNotifier notifier,
             IClock clock,
@@ -53,6 +54,7 @@ public static class TramitesOnboardingEndpoints
                 tenant.IsSuperAdmin,
                 tenant.UserId!.Value,
                 onboarding,
+                authSettings,
                 signingKey,
                 baseUrl,
                 notifier,
@@ -174,6 +176,22 @@ public static class TramitesOnboardingEndpoints
         })
         .AllowAnonymous()
         .WithName("TramitesOnboardingPasswordPolicy");
+
+        group.MapGet("/global-settings", async (
+            IGlobalAuthSettingsReader authSettings,
+            CancellationToken ct) =>
+        {
+            var settings = await authSettings.GetAsync(ct);
+            return Results.Ok(new
+            {
+                invitationTtlMinutes = settings.InvitationTtlMinutes,
+                passwordResetTtlMinutes = settings.PasswordResetTtlMinutes,
+                accessTokenTtlMinutes = settings.AccessTokenTtlMinutes,
+                refreshTokenTtlDays = settings.RefreshTokenTtlDays,
+            });
+        })
+        .AllowAnonymous()
+        .WithName("TramitesOnboardingGlobalSettings");
     }
 
     private static byte[] LoadSigningKey(IConfiguration config)

@@ -11,8 +11,6 @@ public static class TramitesPasswordResetUseCases
     public const string InvalidTokenCode = "INVALID_RESET_TOKEN";
     public const string PolicyViolationCode = TramitesPasswordPolicyValidator.PolicyViolationCode;
 
-    public static readonly TimeSpan ResetTtl = TimeSpan.FromMinutes(30);
-
     public sealed record RequestCommand(string Email, string? IpAddress, string? UserAgent);
 
     public sealed record RequestSuccess(string RecipientEmail, string RawToken, DateTimeOffset ExpiresAt);
@@ -23,6 +21,7 @@ public static class TramitesPasswordResetUseCases
         RequestCommand cmd,
         IIdentityAccountRepository accounts,
         IIdentityPasswordResetRepository resets,
+        IGlobalAuthSettingsReader authSettings,
         IClock clock,
         CancellationToken ct = default)
     {
@@ -34,9 +33,10 @@ public static class TramitesPasswordResetUseCases
         if (user is null || user.AccountState is not "active")
             return null;
 
+        var tokenSettings = await authSettings.GetAsync(ct);
         var rawToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
         var tokenHash = HashToken(rawToken);
-        var expiresAt = clock.UtcNow.Add(ResetTtl);
+        var expiresAt = clock.UtcNow.Add(tokenSettings.PasswordResetTtl);
 
         await resets.CreateTokenAsync(
             user.TenantId, user.Id, tokenHash, expiresAt, ct);

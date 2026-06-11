@@ -143,6 +143,7 @@ public static class TramitesAuthEndpoints
             HttpContext http,
             IIdentityAccountRepository accounts,
             IIdentityPasswordResetRepository resets,
+            IGlobalAuthSettingsReader authSettings,
             IGlobalEmailService emailService,
             IConfiguration config,
             IClock clock,
@@ -155,6 +156,7 @@ public static class TramitesAuthEndpoints
                     http.Request.Headers.UserAgent.ToString()),
                 accounts,
                 resets,
+                authSettings,
                 clock,
                 ct);
 
