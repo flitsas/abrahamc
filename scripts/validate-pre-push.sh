@@ -8,6 +8,9 @@ cd "$ROOT"
 echo "==> dotnet test (Flit.Api.Tests)"
 dotnet test services/core-api/tests/Flit.Api.Tests/Flit.Api.Tests.csproj
 
+echo "==> dotnet build (Release)"
+dotnet build services/core-api/Flit.slnx --configuration Release
+
 bash "$(dirname "$0")/validate-ef-migrations.sh"
 
 echo "==> gitleaks (archivos trackeados por git — mismo alcance que CI)"

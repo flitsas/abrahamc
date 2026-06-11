@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Bloquea push si falla la puerta local (mismo alcance que .cursor/rules/pre-push-gate.mdc).
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+if [ -f "$ROOT/scripts/validate-pre-push.sh" ]; then
+  bash "$ROOT/scripts/validate-pre-push.sh"
+else
+  echo "ERROR: scripts/validate-pre-push.sh no encontrado" >&2
+  exit 1
+fi

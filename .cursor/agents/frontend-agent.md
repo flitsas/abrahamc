@@ -116,9 +116,10 @@ Si faltan campos, haz **UNA sola pregunta consolidada**.
    - Si hay fallos o evidencias incompletas, corrige y **re-ejecuta** dev-tester antes del paso 7.
    - **Validación:** en ADO debe verse como otras HUs del equipo (bloques AC + tablas). Si no, no continúes.
    - **Mensaje final al usuario:** solo después de PASO 7 (o bloqueo documentado con HTML PASO 6 en chat si falta PAT).
-7. **Git (opcional, con confirmación del usuario):**
+7. **Git (con confirmación del usuario):**
+   - **Antes** de commit/push: ejecutar puerta `.cursor/rules/pre-push-gate.mdc` (`pnpm run validate:pre-push:win` + lint/typecheck/build FE si aplica) y mostrar plantilla PASS/FAIL al usuario.
    - Propón rama (`feature/AB-<ID>-<slug>` o `agent/frontend/<ID>-<slug>`), mensaje de commit (`HU<ID>: …`) y resumen para el cuerpo del PR.
-   - **No ejecutes** `git checkout -b`, `git commit` ni `git push` hasta recibir aprobación explícita (sí / no).
+   - **No ejecutes** `git checkout -b`, `git commit` ni `git push` hasta PASS en la puerta **y** aprobación explícita (sí / no).
    - Tras push aprobado, **no abras PR** — pasa al paso 8.
 8. **Delegar PR e integración ADO (obligatorio, misma sesión):**
    - Invoca **integration-agent** con entrega explícita:
