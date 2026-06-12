@@ -19,4 +19,26 @@ public sealed class EfOtQxIntegrationRepository(FlitDbContext db) : IOtQxIntegra
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.TrafficAgencyId == trafficAgencyId && x.IsActive, ct);
     }
+
+    public async Task<OtQxIntegration> UpsertModeAsync(
+        Guid trafficAgencyId,
+        string mode,
+        Guid actorUserId,
+        DateTimeOffset now,
+        CancellationToken ct = default)
+    {
+        var existing = await db.OtQxIntegrations
+            .FirstOrDefaultAsync(x => x.TrafficAgencyId == trafficAgencyId && x.IsActive, ct);
+
+        if (existing is null)
+        {
+            var created = OtQxIntegration.Create(trafficAgencyId, mode, actorUserId, now);
+            await db.OtQxIntegrations.AddAsync(created, ct);
+            return created;
+        }
+
+        existing.ChangeMode(mode, actorUserId, now);
+        db.OtQxIntegrations.Update(existing);
+        return existing;
+    }
 }

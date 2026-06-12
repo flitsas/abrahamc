@@ -187,6 +187,10 @@ public static class InfrastructureExtensions
 
         // ── OT QX Integrations (#9455 OT-02) ───────────────────────────
         services.AddScoped<IOtQxIntegrationRepository, EfOtQxIntegrationRepository>();
+        services.AddScoped<IOtDashboardRepository, NpgsqlOtDashboardRepository>();
+        services.AddScoped<IIntegrationLogRepository, NpgsqlIntegrationLogRepository>();
+        services.AddSingleton<IQuipuxWebhookAdapter, QuipuxMockWebhookAdapter>();
+        services.AddScoped<IOtDocumentLabelRepository, NpgsqlOtDocumentLabelRepository>();
 
         // ── OT Rules (#9456 OT-03) ──────────────────────────────────────
         services.AddScoped<IOtRuleRepository, EfOtRuleRepository>();

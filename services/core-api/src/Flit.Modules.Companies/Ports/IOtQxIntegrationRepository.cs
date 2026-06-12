@@ -10,4 +10,11 @@ public interface IOtQxIntegrationRepository
     /// Retorna null si el OT no tiene integración QX configurada (se asume modo dashboard por defecto).
     /// </summary>
     Task<OtQxIntegration?> GetByTrafficAgencyAsync(Guid trafficAgencyId, CancellationToken ct = default);
+
+    Task<OtQxIntegration> UpsertModeAsync(
+        Guid trafficAgencyId,
+        string mode,
+        Guid actorUserId,
+        DateTimeOffset now,
+        CancellationToken ct = default);
 }

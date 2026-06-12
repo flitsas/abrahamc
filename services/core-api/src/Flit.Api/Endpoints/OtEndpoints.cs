@@ -241,7 +241,86 @@ public static class OtEndpoints
         })
         .WithName("ApproveOtProcedure")
         .WithSummary("Aprueba un trámite OT en modo Dashboard (AC1) o QX con idempotencia (AC2)");
+
+        // GET /api/v1/ot/agencies/{agencyId}/dashboard — HU #9697 AC1
+        group.MapGet("/agencies/{agencyId:guid}/dashboard", async (
+            Guid agencyId,
+            IOtDashboardRepository dashboardRepo,
+            IOtQxIntegrationRepository qxRepo,
+            ITokenIssuer tokenIssuer,
+            ICompaniesSessionContext session,
+            HttpContext ctx,
+            CancellationToken ct) =>
+        {
+            if (!OtEndpointAuth.CanRead(ctx, tokenIssuer, session))
+                return Results.Json(new { error = "Forbidden" }, statusCode: StatusCodes.Status403Forbidden);
+
+            var result = await GetOtDashboard.HandleAsync(agencyId, dashboardRepo, qxRepo, ct);
+            if (!result.IsSuccess)
+                return Results.UnprocessableEntity(new { error = result.Error });
+
+            var r = result.Value;
+            var apiMode = string.Equals(r.IntegrationMode, "qx", StringComparison.OrdinalIgnoreCase)
+                ? "quipux"
+                : r.IntegrationMode;
+
+            return Results.Ok(new
+            {
+                traffic_agency_id = r.TrafficAgencyId,
+                integration_mode = apiMode,
+                total_procedures = r.TotalProcedures,
+                by_state = r.ByState.Select(s => new { state = s.State, count = s.Count }),
+                recent_procedures = r.RecentProcedures.Select(p => new
+                {
+                    id = p.Id,
+                    reference_number = p.ReferenceNumber,
+                    state = p.State,
+                    radicated_at = p.RadicatedAt,
+                }),
+            });
+        })
+        .WithName("GetOtDashboard")
+        .WithSummary("Dashboard unificado OT — métricas desde BD FLIT (HU #9697)");
+
+        // PATCH /api/v1/ot/agencies/{agencyId}/integration-mode — HU #9697 AC2-AC4
+        group.MapPatch("/agencies/{agencyId:guid}/integration-mode", async (
+            Guid agencyId,
+            IntegrationModeRequest req,
+            IOtQxIntegrationRepository qxRepo,
+            FlitDbContext db,
+            IClock clock,
+            ITokenIssuer tokenIssuer,
+            ICompaniesSessionContext session,
+            HttpContext ctx,
+            CancellationToken ct) =>
+        {
+            if (!OtEndpointAuth.CanAdminister(ctx, tokenIssuer, session))
+                return Results.Json(new { error = "Forbidden" }, statusCode: StatusCodes.Status403Forbidden);
+
+            if (string.IsNullOrWhiteSpace(req.Mode))
+                return Results.BadRequest(new { error = "mode es requerido.", valid_modes = ValidIntegrationModes });
+
+            var actorId = session.ActorUserId ?? DefaultActorUserId;
+            var cmd = new UpdateOtIntegrationMode.Command(agencyId, req.Mode, actorId);
+            var result = await UpdateOtIntegrationMode.HandleAsync(
+                cmd,
+                qxRepo,
+                async cancellationToken => await db.SaveChangesAsync(cancellationToken),
+                clock,
+                ct);
+
+            return result.IsSuccess
+                ? Results.Ok(new { traffic_agency_id = result.Value.TrafficAgencyId, mode = result.Value.Mode })
+                : Results.BadRequest(new { error = result.Error, valid_modes = ValidIntegrationModes });
+        })
+        .WithName("UpdateOtIntegrationMode")
+        .WithSummary("Hot-swap modo Dashboard/QX del OT (HU #9697)");
     }
+
+    public sealed record IntegrationModeRequest(string Mode);
+
+    private static readonly Guid DefaultActorUserId = Guid.Parse("00000000-0000-7000-8000-000000000001");
+    private static readonly string[] ValidIntegrationModes = ["dashboard", "quipux"];
 
     private static HashSet<string> ResolvePermissionSlugs(
         HttpContext ctx,
