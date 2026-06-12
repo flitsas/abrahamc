@@ -33,4 +33,16 @@ export const queryKeys = {
       ["companies-admin", "authorized-agencies", tenantId] as const,
     otCatalog: ["companies-admin", "ot-catalog"] as const,
   },
+  parametrizadorAdmin: {
+    families: ["parametrizador-admin", "families"] as const,
+    catalogEdges: ["parametrizador-admin", "catalog-edges"] as const,
+    types: (tenantId: string) =>
+      ["parametrizador-admin", "types", tenantId] as const,
+    matrix: (tenantId: string, typeCode: string) =>
+      ["parametrizador-admin", "matrix", tenantId, typeCode] as const,
+    edgeForm: (tenantId: string, typeCode: string, edgeCode: string) =>
+      ["parametrizador-admin", "edge-form", tenantId, typeCode, edgeCode] as const,
+    rules: (tenantId: string, procedureTypeId: string) =>
+      ["parametrizador-admin", "rules", tenantId, procedureTypeId] as const,
+  },
 };

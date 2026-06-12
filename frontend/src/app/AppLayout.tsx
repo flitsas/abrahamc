@@ -6,6 +6,7 @@ import { usePermission } from "../features/auth/hooks/usePermission.js";
 import { HomePage } from "../features/home/pages/HomePage.js";
 import { UsersAdminPage } from "../features/identity-admin/pages/UsersAdminPage.js";
 import { CompaniesAdminPage } from "../features/companies-admin/pages/CompaniesAdminPage.js";
+import { ParametrizacionAdminPage } from "../features/parametrizador-admin/pages/ParametrizacionAdminPage.js";
 import { ProceduresPage } from "../features/procedures/pages/ProceduresPage.js";
 import { AppShell } from "../shared/components/flit/AppShell.js";
 
@@ -83,6 +84,28 @@ const USERS_NAV_ITEM: NavItem = {
   ),
 };
 
+const PARAMETRIZACION_NAV_ITEM: NavItem = {
+  id: "parametrizacion",
+  to: "/admin/parametrizacion",
+  label: "Parametrización",
+  icon: (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 3l7 4v5c0 4-3 7-7 9-4-2-7-5-7-9V7l7-4z" />
+      <path d="M9 12h6M12 9v6" />
+    </svg>
+  ),
+};
+
 const COMPANIES_NAV_ITEM: NavItem = {
   id: "companies",
   to: "/admin/companies",
@@ -107,12 +130,16 @@ const COMPANIES_NAV_ITEM: NavItem = {
 function useAppNavItems(): NavItem[] {
   const canManageUsers = usePermission(PERMISSIONS.manageUsers);
   const canViewCompanies = usePermission(PERMISSIONS.viewCompanies);
+  const canViewParametrizacion = usePermission(PERMISSIONS.viewParametrizacion);
   const items = [...BASE_NAV_ITEMS];
   if (canManageUsers) {
     items.push(USERS_NAV_ITEM);
   }
   if (canViewCompanies) {
     items.push(COMPANIES_NAV_ITEM);
+  }
+  if (canViewParametrizacion) {
+    items.push(PARAMETRIZACION_NAV_ITEM);
   }
   return items;
 }
@@ -133,6 +160,8 @@ export function AppLayout({ previewPath }: AppLayoutProps) {
           <UsersAdminPage />
         ) : previewPath === "/admin/companies" ? (
           <CompaniesAdminPage />
+        ) : previewPath === "/admin/parametrizacion" ? (
+          <ParametrizacionAdminPage />
         ) : (
           <HomePage />
         )}
@@ -158,6 +187,14 @@ export function AppLayout({ previewPath }: AppLayoutProps) {
           element={
             <RequirePermissionRoute permission={PERMISSIONS.viewCompanies}>
               <CompaniesAdminPage />
+            </RequirePermissionRoute>
+          }
+        />
+        <Route
+          path="/admin/parametrizacion"
+          element={
+            <RequirePermissionRoute permission={PERMISSIONS.viewParametrizacion}>
+              <ParametrizacionAdminPage />
             </RequirePermissionRoute>
           }
         />

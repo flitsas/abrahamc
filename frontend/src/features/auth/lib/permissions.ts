@@ -5,6 +5,9 @@ export const PERMISSIONS = {
   manageCompanies: "modulo.companias.gestionar",
   editCompanyConfig: "ui.companias.editar-config",
   crudTotalCompanies: "modulo.companias.crud-total",
+  viewParametrizacion: "modulo.parametrizacion.crud-total",
+  manageParametrizacion: "modulo.parametrizacion.gestionar",
+  simulateParametrizacionRules: "ui.parametrizacion.simular-reglas",
 } as const;
 
 export type PermissionSlug =
