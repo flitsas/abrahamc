@@ -109,7 +109,13 @@ public static class UpdateAdminTenantActivation
 
 public static class UpdateAdminProcedureTypeGlobal
 {
+    public const string ForbiddenNotSuperAdminCode = "SUPER_ADMIN_REQUIRED";
+
     public sealed record Command(Guid TenantId, string ProcedureTypeCode, bool IsActive);
+
+    /// <summary>HU #9695 AC4 — solo SuperAdmin puede cambiar is_active global.</summary>
+    public static string? ValidateSuperAdmin(bool isSuperAdmin) =>
+        isSuperAdmin ? null : ForbiddenNotSuperAdminCode;
 
     public static Task<bool> HandleAsync(
         Command command,
@@ -256,5 +262,82 @@ public static class DeleteAdminQueryConfig
             command.TenantId,
             command.ProcedureTypeCode,
             command.QueryConfigId,
+            ct);
+}
+
+public static class GetAdminEdgeForm
+{
+    public sealed record Query(Guid TenantId, string ProcedureTypeCode, string EdgeCode);
+
+    public static Task<AdminEdgeFormView?> HandleAsync(
+        Query query,
+        IProceduresConfigAdminRepository repo,
+        CancellationToken ct = default) =>
+        repo.GetFormByEdgeAsync(query.TenantId, query.ProcedureTypeCode, query.EdgeCode, ct);
+}
+
+public static class CreateAdminFormSection
+{
+    public static Task<(AdminFormSectionItem? Ok, string? Error)> HandleAsync(
+        CreateFormSectionCommand command,
+        IProceduresConfigAdminRepository repo,
+        CancellationToken ct = default) =>
+        repo.CreateFormSectionAsync(command, ct);
+}
+
+public static class UpdateAdminFormSection
+{
+    public static Task<(AdminFormSectionItem? Ok, string? Error)> HandleAsync(
+        UpdateFormSectionCommand command,
+        IProceduresConfigAdminRepository repo,
+        CancellationToken ct = default) =>
+        repo.UpdateFormSectionAsync(command, ct);
+}
+
+public static class DeactivateAdminFormSection
+{
+    public sealed record Command(Guid TenantId, string ProcedureTypeCode, Guid SectionId);
+
+    public static Task<bool> HandleAsync(
+        Command command,
+        IProceduresConfigAdminRepository repo,
+        CancellationToken ct = default) =>
+        repo.DeactivateFormSectionAsync(
+            command.TenantId,
+            command.ProcedureTypeCode,
+            command.SectionId,
+            ct);
+}
+
+public static class CreateAdminFormField
+{
+    public static Task<(AdminFormFieldItem? Ok, string? Error)> HandleAsync(
+        CreateFormFieldCommand command,
+        IProceduresConfigAdminRepository repo,
+        CancellationToken ct = default) =>
+        repo.CreateFormFieldAsync(command, ct);
+}
+
+public static class UpdateAdminFormField
+{
+    public static Task<(AdminFormFieldItem? Ok, string? Error)> HandleAsync(
+        UpdateFormFieldCommand command,
+        IProceduresConfigAdminRepository repo,
+        CancellationToken ct = default) =>
+        repo.UpdateFormFieldAsync(command, ct);
+}
+
+public static class DeactivateAdminFormField
+{
+    public sealed record Command(Guid TenantId, string ProcedureTypeCode, Guid FieldId);
+
+    public static Task<bool> HandleAsync(
+        Command command,
+        IProceduresConfigAdminRepository repo,
+        CancellationToken ct = default) =>
+        repo.DeactivateFormFieldAsync(
+            command.TenantId,
+            command.ProcedureTypeCode,
+            command.FieldId,
             ct);
 }

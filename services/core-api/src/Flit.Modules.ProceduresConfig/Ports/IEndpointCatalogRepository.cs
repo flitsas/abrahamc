@@ -26,6 +26,7 @@ public sealed record EndpointCatalogWriteModel(
     string Method,
     string AuthType,
     string AuthConfigJson,
+    string FieldMappingJson,
     int TimeoutMs,
     bool IsActive,
     Guid ActorUserId,

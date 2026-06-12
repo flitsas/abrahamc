@@ -17,6 +17,7 @@ public static class ListEndpointCatalog
         string Method,
         string AuthType,
         JsonElement AuthConfig,
+        JsonElement FieldMapping,
         int TimeoutMs,
         bool IsActive,
         int RowVersion);
@@ -38,6 +39,7 @@ public static class ListEndpointCatalog
         r.Method,
         r.AuthType,
         EndpointAuthConfigValidator.SanitizeForResponse(r.AuthConfig),
+        r.FieldMapping,
         r.TimeoutMs,
         r.IsActive,
         r.RowVersion);
@@ -67,6 +69,7 @@ public static class CreateEndpointCatalogEntry
         string Method,
         string AuthType,
         JsonElement AuthConfig,
+        JsonElement FieldMapping,
         int TimeoutMs,
         bool IsActive,
         Guid ActorUserId);
@@ -80,6 +83,14 @@ public static class CreateEndpointCatalogEntry
         {
             return Result<ListEndpointCatalog.ItemDto, EndpointCatalogError>.Failure(
                 new EndpointCatalogError(EndpointCatalogErrorKind.Validation, authError!));
+        }
+
+        if (!FieldMappingValidator.TryValidate(
+                EndpointCatalogMappingHelpers.NormalizeFieldMappingElement(command.FieldMapping),
+                out var mappingError))
+        {
+            return Result<ListEndpointCatalog.ItemDto, EndpointCatalogError>.Failure(
+                new EndpointCatalogError(EndpointCatalogErrorKind.Validation, mappingError!));
         }
 
         if (string.IsNullOrWhiteSpace(command.Code) || string.IsNullOrWhiteSpace(command.Name) ||
@@ -101,6 +112,7 @@ public static class CreateEndpointCatalogEntry
                     Method: command.Method.Trim().ToUpperInvariant(),
                     AuthType: command.AuthType.Trim().ToLowerInvariant(),
                     AuthConfigJson: command.AuthConfig.GetRawText(),
+                    FieldMappingJson: EndpointCatalogMappingHelpers.NormalizeFieldMappingJson(command.FieldMapping),
                     TimeoutMs: command.TimeoutMs,
                     IsActive: command.IsActive,
                     ActorUserId: command.ActorUserId),
@@ -128,6 +140,7 @@ public static class UpdateEndpointCatalogEntry
         string Method,
         string AuthType,
         JsonElement AuthConfig,
+        JsonElement FieldMapping,
         int TimeoutMs,
         bool IsActive,
         int RowVersion,
@@ -144,6 +157,14 @@ public static class UpdateEndpointCatalogEntry
                 new EndpointCatalogError(EndpointCatalogErrorKind.Validation, authError!));
         }
 
+        if (!FieldMappingValidator.TryValidate(
+                EndpointCatalogMappingHelpers.NormalizeFieldMappingElement(command.FieldMapping),
+                out var mappingError))
+        {
+            return Result<ListEndpointCatalog.ItemDto, EndpointCatalogError>.Failure(
+                new EndpointCatalogError(EndpointCatalogErrorKind.Validation, mappingError!));
+        }
+
         var updated = await repo.UpdateAsync(
             new EndpointCatalogWriteModel(
                 Id: command.Id,
@@ -154,6 +175,7 @@ public static class UpdateEndpointCatalogEntry
                 Method: command.Method.Trim().ToUpperInvariant(),
                 AuthType: command.AuthType.Trim().ToLowerInvariant(),
                 AuthConfigJson: command.AuthConfig.GetRawText(),
+                FieldMappingJson: EndpointCatalogMappingHelpers.NormalizeFieldMappingJson(command.FieldMapping),
                 TimeoutMs: command.TimeoutMs,
                 IsActive: command.IsActive,
                 ActorUserId: command.ActorUserId,
@@ -189,3 +211,16 @@ public static class DeleteEndpointCatalogEntry
 }
 
 public readonly record struct Unit;
+
+internal static class EndpointCatalogMappingHelpers
+{
+    internal static string NormalizeFieldMappingJson(JsonElement fieldMapping) =>
+        fieldMapping.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined
+            ? "{}"
+            : fieldMapping.GetRawText();
+
+    internal static JsonElement NormalizeFieldMappingElement(JsonElement fieldMapping) =>
+        fieldMapping.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined
+            ? JsonRuleElements.Parse("{}")
+            : fieldMapping;
+}

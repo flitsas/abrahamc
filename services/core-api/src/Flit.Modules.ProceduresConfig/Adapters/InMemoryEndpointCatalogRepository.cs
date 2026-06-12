@@ -20,6 +20,7 @@ public sealed class InMemoryEndpointCatalogRepository : IEndpointCatalogReposito
             "GET",
             "none",
             JsonRuleElements.Parse("{}"),
+            JsonRuleElements.Parse("{}"),
             TimeoutMs: 5000,
             IsActive: true,
             RowVersion: 1,
@@ -60,6 +61,7 @@ public sealed class InMemoryEndpointCatalogRepository : IEndpointCatalogReposito
         }
 
         using var authDoc = JsonDocument.Parse(model.AuthConfigJson);
+        using var mappingDoc = JsonDocument.Parse(model.FieldMappingJson);
         var record = new EndpointCatalogRecord(
             Guid.NewGuid(),
             model.TenantId,
@@ -69,6 +71,7 @@ public sealed class InMemoryEndpointCatalogRepository : IEndpointCatalogReposito
             model.Method,
             model.AuthType,
             authDoc.RootElement.Clone(),
+            mappingDoc.RootElement.Clone(),
             model.TimeoutMs,
             model.IsActive,
             RowVersion: 1,
@@ -94,6 +97,7 @@ public sealed class InMemoryEndpointCatalogRepository : IEndpointCatalogReposito
         }
 
         using var authDoc = JsonDocument.Parse(model.AuthConfigJson);
+        using var mappingDoc = JsonDocument.Parse(model.FieldMappingJson);
         var updated = current with
         {
             Name = model.Name,
@@ -101,6 +105,7 @@ public sealed class InMemoryEndpointCatalogRepository : IEndpointCatalogReposito
             Method = model.Method,
             AuthType = model.AuthType,
             AuthConfig = authDoc.RootElement.Clone(),
+            FieldMapping = mappingDoc.RootElement.Clone(),
             TimeoutMs = model.TimeoutMs,
             IsActive = model.IsActive,
             RowVersion = current.RowVersion + 1,

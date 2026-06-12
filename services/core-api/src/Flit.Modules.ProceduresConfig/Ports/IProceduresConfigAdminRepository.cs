@@ -262,4 +262,109 @@ public interface IProceduresConfigAdminRepository
         string procedureTypeCode,
         Guid queryConfigId,
         CancellationToken ct = default);
+
+    Task<AdminEdgeFormView?> GetFormByEdgeAsync(
+        Guid tenantId,
+        string procedureTypeCode,
+        string edgeCode,
+        CancellationToken ct = default);
+
+    Task<(AdminFormSectionItem? Ok, string? Error)> CreateFormSectionAsync(
+        CreateFormSectionCommand command,
+        CancellationToken ct = default);
+
+    Task<(AdminFormSectionItem? Ok, string? Error)> UpdateFormSectionAsync(
+        UpdateFormSectionCommand command,
+        CancellationToken ct = default);
+
+    Task<bool> DeactivateFormSectionAsync(
+        Guid tenantId,
+        string procedureTypeCode,
+        Guid sectionId,
+        CancellationToken ct = default);
+
+    Task<(AdminFormFieldItem? Ok, string? Error)> CreateFormFieldAsync(
+        CreateFormFieldCommand command,
+        CancellationToken ct = default);
+
+    Task<(AdminFormFieldItem? Ok, string? Error)> UpdateFormFieldAsync(
+        UpdateFormFieldCommand command,
+        CancellationToken ct = default);
+
+    Task<bool> DeactivateFormFieldAsync(
+        Guid tenantId,
+        string procedureTypeCode,
+        Guid fieldId,
+        CancellationToken ct = default);
 }
+
+public sealed record AdminFormFieldItem(
+    Guid Id,
+    string FieldKey,
+    string DataType,
+    string Label,
+    bool IsRequired,
+    int DisplayOrder,
+    string UiState,
+    bool IsTrigger,
+    IReadOnlyDictionary<string, object?> Validation,
+    IReadOnlyList<object> Options,
+    int RowVersion);
+
+public sealed record AdminFormSectionItem(
+    Guid Id,
+    string SectionKey,
+    string Title,
+    int DisplayOrder,
+    string UiMode,
+    string EdgeCode,
+    int RowVersion,
+    IReadOnlyList<AdminFormFieldItem> Fields);
+
+public sealed record AdminEdgeFormView(
+    string ProcedureTypeCode,
+    string EdgeCode,
+    IReadOnlyList<AdminFormSectionItem> Sections);
+
+public sealed record CreateFormSectionCommand(
+    Guid TenantId,
+    string ProcedureTypeCode,
+    string EdgeCode,
+    string SectionKey,
+    string Title,
+    int DisplayOrder,
+    string UiMode);
+
+public sealed record UpdateFormSectionCommand(
+    Guid TenantId,
+    string ProcedureTypeCode,
+    Guid SectionId,
+    string? Title,
+    int? DisplayOrder,
+    string? UiMode);
+
+public sealed record CreateFormFieldCommand(
+    Guid TenantId,
+    string ProcedureTypeCode,
+    Guid SectionId,
+    string FieldKey,
+    string DataType,
+    string Label,
+    bool IsRequired,
+    int DisplayOrder,
+    string UiState,
+    bool IsTrigger,
+    string? ValidationJson,
+    string? OptionsJson);
+
+public sealed record UpdateFormFieldCommand(
+    Guid TenantId,
+    string ProcedureTypeCode,
+    Guid FieldId,
+    string? Label,
+    bool? IsRequired,
+    int? DisplayOrder,
+    string? UiState,
+    bool? IsTrigger,
+    string? ValidationJson,
+    string? OptionsJson);

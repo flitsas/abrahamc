@@ -15,7 +15,7 @@ public sealed class NpgsqlEndpointCatalogRepository(FlitDbContext db) : IEndpoin
         return await QueryAsync(
             """
             SELECT id, tenant_id, code, name, url, method, auth_type, auth_config::text,
-                   timeout_ms, is_active, row_version, created_at, updated_at
+                   field_mapping::text, timeout_ms, is_active, row_version, created_at, updated_at
             FROM procedures_config.endpoint_catalog
             WHERE tenant_id = @tenant_id AND deleted_at IS NULL
             ORDER BY code ASC
@@ -32,7 +32,7 @@ public sealed class NpgsqlEndpointCatalogRepository(FlitDbContext db) : IEndpoin
         var list = await QueryAsync(
             """
             SELECT id, tenant_id, code, name, url, method, auth_type, auth_config::text,
-                   timeout_ms, is_active, row_version, created_at, updated_at
+                   field_mapping::text, timeout_ms, is_active, row_version, created_at, updated_at
             FROM procedures_config.endpoint_catalog
             WHERE tenant_id = @tenant_id AND id = @id AND deleted_at IS NULL
             """,
@@ -54,7 +54,7 @@ public sealed class NpgsqlEndpointCatalogRepository(FlitDbContext db) : IEndpoin
         var list = await QueryAsync(
             """
             SELECT id, tenant_id, code, name, url, method, auth_type, auth_config::text,
-                   timeout_ms, is_active, row_version, created_at, updated_at
+                   field_mapping::text, timeout_ms, is_active, row_version, created_at, updated_at
             FROM procedures_config.endpoint_catalog
             WHERE tenant_id = @tenant_id AND code = @code AND deleted_at IS NULL
             """,
@@ -77,14 +77,14 @@ public sealed class NpgsqlEndpointCatalogRepository(FlitDbContext db) : IEndpoin
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             INSERT INTO procedures_config.endpoint_catalog (
-              id, tenant_id, code, name, url, method, auth_type, auth_config,
+              id, tenant_id, code, name, url, method, auth_type, auth_config, field_mapping,
               timeout_ms, is_active, created_by, updated_by
             ) VALUES (
               @id, @tenant_id, @code, @name, @url, @method, @auth_type, @auth_config::jsonb,
-              @timeout_ms, @is_active, @actor, @actor
+              @field_mapping::jsonb, @timeout_ms, @is_active, @actor, @actor
             )
             RETURNING id, tenant_id, code, name, url, method, auth_type, auth_config::text,
-                      timeout_ms, is_active, row_version, created_at, updated_at
+                      field_mapping::text, timeout_ms, is_active, row_version, created_at, updated_at
             """;
 
         Add(cmd, "id", id);
@@ -95,6 +95,7 @@ public sealed class NpgsqlEndpointCatalogRepository(FlitDbContext db) : IEndpoin
         Add(cmd, "method", model.Method);
         Add(cmd, "auth_type", model.AuthType);
         Add(cmd, "auth_config", model.AuthConfigJson);
+        Add(cmd, "field_mapping", model.FieldMappingJson);
         Add(cmd, "timeout_ms", model.TimeoutMs);
         Add(cmd, "is_active", model.IsActive);
         Add(cmd, "actor", model.ActorUserId);
@@ -128,6 +129,7 @@ public sealed class NpgsqlEndpointCatalogRepository(FlitDbContext db) : IEndpoin
                 method = @method,
                 auth_type = @auth_type,
                 auth_config = @auth_config::jsonb,
+                field_mapping = @field_mapping::jsonb,
                 timeout_ms = @timeout_ms,
                 is_active = @is_active,
                 updated_by = @actor,
@@ -137,7 +139,7 @@ public sealed class NpgsqlEndpointCatalogRepository(FlitDbContext db) : IEndpoin
               AND deleted_at IS NULL
               AND (@expected_row_version IS NULL OR row_version = @expected_row_version)
             RETURNING id, tenant_id, code, name, url, method, auth_type, auth_config::text,
-                      timeout_ms, is_active, row_version, created_at, updated_at
+                      field_mapping::text, timeout_ms, is_active, row_version, created_at, updated_at
             """;
 
         Add(cmd, "tenant_id", model.TenantId);
@@ -147,6 +149,7 @@ public sealed class NpgsqlEndpointCatalogRepository(FlitDbContext db) : IEndpoin
         Add(cmd, "method", model.Method);
         Add(cmd, "auth_type", model.AuthType);
         Add(cmd, "auth_config", model.AuthConfigJson);
+        Add(cmd, "field_mapping", model.FieldMappingJson);
         Add(cmd, "timeout_ms", model.TimeoutMs);
         Add(cmd, "is_active", model.IsActive);
         Add(cmd, "actor", model.ActorUserId);
@@ -217,6 +220,7 @@ public sealed class NpgsqlEndpointCatalogRepository(FlitDbContext db) : IEndpoin
     private static EndpointCatalogRecord ReadRow(System.Data.Common.DbDataReader reader)
     {
         using var authDoc = JsonDocument.Parse(reader.GetString(7));
+        using var mappingDoc = JsonDocument.Parse(reader.GetString(8));
         return new EndpointCatalogRecord(
             reader.GetGuid(0),
             reader.GetGuid(1),
@@ -226,11 +230,12 @@ public sealed class NpgsqlEndpointCatalogRepository(FlitDbContext db) : IEndpoin
             reader.GetString(5),
             reader.GetString(6),
             authDoc.RootElement.Clone(),
-            reader.GetInt32(8),
-            reader.GetBoolean(9),
-            reader.GetInt32(10),
-            new DateTimeOffset(reader.GetDateTime(11), TimeSpan.Zero),
-            new DateTimeOffset(reader.GetDateTime(12), TimeSpan.Zero));
+            mappingDoc.RootElement.Clone(),
+            reader.GetInt32(9),
+            reader.GetBoolean(10),
+            reader.GetInt32(11),
+            new DateTimeOffset(reader.GetDateTime(12), TimeSpan.Zero),
+            new DateTimeOffset(reader.GetDateTime(13), TimeSpan.Zero));
     }
 
     private static void Add(System.Data.Common.DbCommand cmd, string name, object value)

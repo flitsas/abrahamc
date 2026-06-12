@@ -2037,6 +2037,447 @@ public sealed class NpgsqlProceduresConfigAdminRepository(FlitDbContext db) : IP
         return rows > 0;
     }
 
+    public async Task<AdminEdgeFormView?> GetFormByEdgeAsync(
+        Guid tenantId,
+        string procedureTypeCode,
+        string edgeCode,
+        CancellationToken ct = default)
+    {
+        var conn = await OpenWithConfigAdminContextAsync(tenantId, ct);
+        var typeRow = await LoadTypeRowAdminAsync(conn, procedureTypeCode, ct);
+        if (typeRow is null)
+        {
+            return null;
+        }
+
+        var sections = await LoadSectionsForEdgeAdminAsync(conn, typeRow.Id, edgeCode, ct);
+        return new AdminEdgeFormView(procedureTypeCode, edgeCode, sections);
+    }
+
+    public async Task<(AdminFormSectionItem? Ok, string? Error)> CreateFormSectionAsync(
+        CreateFormSectionCommand command,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(command.SectionKey) || string.IsNullOrWhiteSpace(command.Title))
+        {
+            return (null, "sectionKey y title son obligatorios.");
+        }
+
+        if (command.UiMode is not ("read_only" or "interactive"))
+        {
+            return (null, "uiMode debe ser read_only o interactive.");
+        }
+
+        var conn = await OpenWithConfigAdminContextAsync(command.TenantId, ct);
+        var typeId = await LoadTypeIdByCodeAsync(conn, command.ProcedureTypeCode, ct);
+        if (typeId is null)
+        {
+            return (null, "Tipo de trámite no encontrado.");
+        }
+
+        var edgeId = await LoadEdgeIdForTypeAsync(conn, typeId.Value, command.EdgeCode, ct);
+        if (edgeId is null)
+        {
+            return (null, "Arista no encontrada en la matriz del trámite.");
+        }
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO procedures_config.form_sections
+              (procedure_type_id, edge_id, section_key, title, display_order, ui_mode, is_active, created_by, updated_by)
+            VALUES
+              (@type_id, @edge_id, @section_key, @title, @display_order, @ui_mode, TRUE, @user, @user)
+            RETURNING id, section_key, title, display_order, ui_mode, row_version
+            """;
+        AddGuidParam(cmd, "type_id", typeId.Value);
+        AddGuidParam(cmd, "edge_id", edgeId.Value);
+        cmd.Parameters.Add(new NpgsqlParameter("section_key", command.SectionKey.Trim()));
+        cmd.Parameters.Add(new NpgsqlParameter("title", command.Title.Trim()));
+        cmd.Parameters.Add(new NpgsqlParameter("display_order", command.DisplayOrder));
+        cmd.Parameters.Add(new NpgsqlParameter("ui_mode", command.UiMode));
+        AddGuidParam(cmd, "user", SystemUserId);
+
+        try
+        {
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            if (!await reader.ReadAsync(ct))
+            {
+                return (null, "No se pudo crear la sección.");
+            }
+
+            return (new AdminFormSectionItem(
+                reader.GetGuid(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetInt32(3),
+                reader.GetString(4),
+                command.EdgeCode,
+                reader.GetInt32(5),
+                []), null);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            return (null, "Ya existe una sección con esa clave.");
+        }
+    }
+
+    public async Task<(AdminFormSectionItem? Ok, string? Error)> UpdateFormSectionAsync(
+        UpdateFormSectionCommand command,
+        CancellationToken ct = default)
+    {
+        if (command.Title is null && command.DisplayOrder is null && command.UiMode is null)
+        {
+            return (null, "Indique al menos un campo a actualizar.");
+        }
+
+        if (command.UiMode is not null && command.UiMode is not ("read_only" or "interactive"))
+        {
+            return (null, "uiMode debe ser read_only o interactive.");
+        }
+
+        var conn = await OpenWithConfigAdminContextAsync(command.TenantId, ct);
+        var typeId = await LoadTypeIdByCodeAsync(conn, command.ProcedureTypeCode, ct);
+        if (typeId is null)
+        {
+            return (null, "Tipo de trámite no encontrado.");
+        }
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            UPDATE procedures_config.form_sections
+            SET title = COALESCE(@title, title),
+                display_order = COALESCE(@display_order, display_order),
+                ui_mode = COALESCE(@ui_mode, ui_mode),
+                updated_by = @user,
+                updated_at = now()
+            WHERE id = @section_id
+              AND procedure_type_id = @type_id
+              AND is_active = TRUE
+            RETURNING id, section_key, title, display_order, ui_mode, row_version,
+              (SELECT e.code FROM procedures_config.edges e WHERE e.id = form_sections.edge_id)
+            """;
+        AddGuidParam(cmd, "section_id", command.SectionId);
+        AddGuidParam(cmd, "type_id", typeId.Value);
+        cmd.Parameters.Add(new NpgsqlParameter("title", (object?)command.Title?.Trim() ?? DBNull.Value));
+        cmd.Parameters.Add(new NpgsqlParameter("display_order", (object?)command.DisplayOrder ?? DBNull.Value));
+        cmd.Parameters.Add(new NpgsqlParameter("ui_mode", (object?)command.UiMode ?? DBNull.Value));
+        AddGuidParam(cmd, "user", SystemUserId);
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        if (!await reader.ReadAsync(ct))
+        {
+            return (null, "Sección no encontrada.");
+        }
+
+        var sectionId = reader.GetGuid(0);
+        var fields = await LoadAdminFormFieldsAsync(conn, sectionId, ct);
+        return (new AdminFormSectionItem(
+            sectionId,
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetInt32(3),
+            reader.GetString(4),
+            reader.GetString(5),
+            reader.GetInt32(6),
+            fields), null);
+    }
+
+    public async Task<bool> DeactivateFormSectionAsync(
+        Guid tenantId,
+        string procedureTypeCode,
+        Guid sectionId,
+        CancellationToken ct = default)
+    {
+        var conn = await OpenWithConfigAdminContextAsync(tenantId, ct);
+        var typeId = await LoadTypeIdByCodeAsync(conn, procedureTypeCode, ct);
+        if (typeId is null)
+        {
+            return false;
+        }
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            UPDATE procedures_config.form_sections
+            SET is_active = FALSE, updated_by = @user, updated_at = now()
+            WHERE id = @section_id AND procedure_type_id = @type_id AND is_active = TRUE
+            """;
+        AddGuidParam(cmd, "section_id", sectionId);
+        AddGuidParam(cmd, "type_id", typeId.Value);
+        AddGuidParam(cmd, "user", SystemUserId);
+        return await cmd.ExecuteNonQueryAsync(ct) > 0;
+    }
+
+    public async Task<(AdminFormFieldItem? Ok, string? Error)> CreateFormFieldAsync(
+        CreateFormFieldCommand command,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(command.FieldKey) || string.IsNullOrWhiteSpace(command.Label))
+        {
+            return (null, "fieldKey y label son obligatorios.");
+        }
+
+        if (!IsValidFormFieldDataType(command.DataType))
+        {
+            return (null, "dataType inválido.");
+        }
+
+        if (!IsValidFormFieldUiState(command.UiState))
+        {
+            return (null, "uiState inválido.");
+        }
+
+        var conn = await OpenWithConfigAdminContextAsync(command.TenantId, ct);
+        var typeId = await LoadTypeIdByCodeAsync(conn, command.ProcedureTypeCode, ct);
+        if (typeId is null)
+        {
+            return (null, "Tipo de trámite no encontrado.");
+        }
+
+        if (!await FormSectionBelongsToTypeAsync(conn, command.SectionId, typeId.Value, ct))
+        {
+            return (null, "Sección no encontrada.");
+        }
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO procedures_config.form_fields
+              (section_id, field_key, data_type, label, is_required, display_order, ui_state, is_trigger,
+               validation, options, is_active, created_by, updated_by)
+            VALUES
+              (@section_id, @field_key, @data_type, @label, @is_required, @display_order, @ui_state, @is_trigger,
+               @validation::jsonb, @options::jsonb, TRUE, @user, @user)
+            RETURNING id, field_key, data_type, label, is_required, display_order, ui_state, is_trigger,
+                      validation::text, options::text, row_version
+            """;
+        AddGuidParam(cmd, "section_id", command.SectionId);
+        cmd.Parameters.Add(new NpgsqlParameter("field_key", command.FieldKey.Trim()));
+        cmd.Parameters.Add(new NpgsqlParameter("data_type", command.DataType));
+        cmd.Parameters.Add(new NpgsqlParameter("label", command.Label.Trim()));
+        cmd.Parameters.Add(new NpgsqlParameter("is_required", command.IsRequired));
+        cmd.Parameters.Add(new NpgsqlParameter("display_order", command.DisplayOrder));
+        cmd.Parameters.Add(new NpgsqlParameter("ui_state", command.UiState));
+        cmd.Parameters.Add(new NpgsqlParameter("is_trigger", command.IsTrigger));
+        cmd.Parameters.Add(new NpgsqlParameter("validation", command.ValidationJson ?? "{}"));
+        cmd.Parameters.Add(new NpgsqlParameter("options", command.OptionsJson ?? "[]"));
+        AddGuidParam(cmd, "user", SystemUserId);
+
+        try
+        {
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            if (!await reader.ReadAsync(ct))
+            {
+                return (null, "No se pudo crear el campo.");
+            }
+
+            return (ReadAdminFormField(reader), null);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            return (null, "Ya existe un campo con esa clave en la sección.");
+        }
+    }
+
+    public async Task<(AdminFormFieldItem? Ok, string? Error)> UpdateFormFieldAsync(
+        UpdateFormFieldCommand command,
+        CancellationToken ct = default)
+    {
+        if (command.Label is null && command.IsRequired is null && command.DisplayOrder is null &&
+            command.UiState is null && command.IsTrigger is null &&
+            command.ValidationJson is null && command.OptionsJson is null)
+        {
+            return (null, "Indique al menos un campo a actualizar.");
+        }
+
+        if (command.UiState is not null && !IsValidFormFieldUiState(command.UiState))
+        {
+            return (null, "uiState inválido.");
+        }
+
+        var conn = await OpenWithConfigAdminContextAsync(command.TenantId, ct);
+        var typeId = await LoadTypeIdByCodeAsync(conn, command.ProcedureTypeCode, ct);
+        if (typeId is null)
+        {
+            return (null, "Tipo de trámite no encontrado.");
+        }
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            UPDATE procedures_config.form_fields ff
+            SET label = COALESCE(@label, label),
+                is_required = COALESCE(@is_required, is_required),
+                display_order = COALESCE(@display_order, display_order),
+                ui_state = COALESCE(@ui_state, ui_state),
+                is_trigger = COALESCE(@is_trigger, is_trigger),
+                validation = COALESCE(@validation::jsonb, validation),
+                options = COALESCE(@options::jsonb, options),
+                updated_by = @user,
+                updated_at = now()
+            FROM procedures_config.form_sections s
+            WHERE ff.id = @field_id
+              AND ff.section_id = s.id
+              AND s.procedure_type_id = @type_id
+              AND ff.is_active = TRUE
+            RETURNING ff.id, ff.field_key, ff.data_type, ff.label, ff.is_required, ff.display_order,
+                      ff.ui_state, ff.is_trigger, ff.validation::text, ff.options::text, ff.row_version
+            """;
+        AddGuidParam(cmd, "field_id", command.FieldId);
+        AddGuidParam(cmd, "type_id", typeId.Value);
+        cmd.Parameters.Add(new NpgsqlParameter("label", (object?)command.Label?.Trim() ?? DBNull.Value));
+        cmd.Parameters.Add(new NpgsqlParameter("is_required", (object?)command.IsRequired ?? DBNull.Value));
+        cmd.Parameters.Add(new NpgsqlParameter("display_order", (object?)command.DisplayOrder ?? DBNull.Value));
+        cmd.Parameters.Add(new NpgsqlParameter("ui_state", (object?)command.UiState ?? DBNull.Value));
+        cmd.Parameters.Add(new NpgsqlParameter("is_trigger", (object?)command.IsTrigger ?? DBNull.Value));
+        cmd.Parameters.Add(new NpgsqlParameter("validation", (object?)command.ValidationJson ?? DBNull.Value));
+        cmd.Parameters.Add(new NpgsqlParameter("options", (object?)command.OptionsJson ?? DBNull.Value));
+        AddGuidParam(cmd, "user", SystemUserId);
+
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        if (!await reader.ReadAsync(ct))
+        {
+            return (null, "Campo no encontrado.");
+        }
+
+        return (ReadAdminFormField(reader), null);
+    }
+
+    public async Task<bool> DeactivateFormFieldAsync(
+        Guid tenantId,
+        string procedureTypeCode,
+        Guid fieldId,
+        CancellationToken ct = default)
+    {
+        var conn = await OpenWithConfigAdminContextAsync(tenantId, ct);
+        var typeId = await LoadTypeIdByCodeAsync(conn, procedureTypeCode, ct);
+        if (typeId is null)
+        {
+            return false;
+        }
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            UPDATE procedures_config.form_fields ff
+            SET is_active = FALSE, updated_by = @user, updated_at = now()
+            FROM procedures_config.form_sections s
+            WHERE ff.id = @field_id
+              AND ff.section_id = s.id
+              AND s.procedure_type_id = @type_id
+              AND ff.is_active = TRUE
+            """;
+        AddGuidParam(cmd, "field_id", fieldId);
+        AddGuidParam(cmd, "type_id", typeId.Value);
+        AddGuidParam(cmd, "user", SystemUserId);
+        return await cmd.ExecuteNonQueryAsync(ct) > 0;
+    }
+
+    private static async Task<IReadOnlyList<AdminFormSectionItem>> LoadSectionsForEdgeAdminAsync(
+        System.Data.Common.DbConnection conn,
+        Guid typeId,
+        string edgeCode,
+        CancellationToken ct)
+    {
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT s.id, s.section_key, s.title, s.display_order, s.ui_mode, s.row_version, ed.code
+            FROM procedures_config.form_sections s
+            JOIN procedures_config.edges ed ON ed.id = s.edge_id
+            WHERE s.procedure_type_id = @type_id
+              AND ed.code = @edge_code
+              AND s.is_active = TRUE
+            ORDER BY s.display_order
+            """;
+        AddGuidParam(cmd, "type_id", typeId);
+        cmd.Parameters.Add(new NpgsqlParameter("edge_code", edgeCode));
+
+        var sections = new List<(Guid Id, AdminFormSectionItem Section)>();
+        await using (var reader = await cmd.ExecuteReaderAsync(ct))
+        {
+            while (await reader.ReadAsync(ct))
+            {
+                sections.Add((
+                    reader.GetGuid(0),
+                    new AdminFormSectionItem(
+                        reader.GetGuid(0),
+                        reader.GetString(1),
+                        reader.GetString(2),
+                        reader.GetInt32(3),
+                        reader.GetString(4),
+                        reader.GetString(6),
+                        reader.GetInt32(5),
+                        [])));
+            }
+        }
+
+        var result = new List<AdminFormSectionItem>();
+        foreach (var (sectionId, section) in sections)
+        {
+            var fields = await LoadAdminFormFieldsAsync(conn, sectionId, ct);
+            result.Add(section with { Fields = fields });
+        }
+
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<AdminFormFieldItem>> LoadAdminFormFieldsAsync(
+        System.Data.Common.DbConnection conn,
+        Guid sectionId,
+        CancellationToken ct)
+    {
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, field_key, data_type, label, is_required, display_order, ui_state, is_trigger,
+                   validation::text, options::text, row_version
+            FROM procedures_config.form_fields
+            WHERE section_id = @section_id AND is_active = TRUE
+            ORDER BY display_order
+            """;
+        AddGuidParam(cmd, "section_id", sectionId);
+        var list = new List<AdminFormFieldItem>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            list.Add(ReadAdminFormField(reader));
+        }
+
+        return list;
+    }
+
+    private static AdminFormFieldItem ReadAdminFormField(System.Data.Common.DbDataReader reader) =>
+        new(
+            reader.GetGuid(0),
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetString(3),
+            reader.GetBoolean(4),
+            reader.GetInt32(5),
+            reader.GetString(6),
+            reader.GetBoolean(7),
+            ParseJsonObject(reader.GetString(8)),
+            ParseJsonArray(reader.GetString(9)),
+            reader.GetInt32(10));
+
+    private static async Task<bool> FormSectionBelongsToTypeAsync(
+        System.Data.Common.DbConnection conn,
+        Guid sectionId,
+        Guid typeId,
+        CancellationToken ct)
+    {
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT 1 FROM procedures_config.form_sections
+            WHERE id = @section_id AND procedure_type_id = @type_id AND is_active = TRUE
+            LIMIT 1
+            """;
+        AddGuidParam(cmd, "section_id", sectionId);
+        AddGuidParam(cmd, "type_id", typeId);
+        return await cmd.ExecuteScalarAsync(ct) is not null;
+    }
+
+    private static bool IsValidFormFieldDataType(string dataType) =>
+        dataType is "text" or "number" or "date" or "boolean" or "select" or "multiselect" or "file";
+
+    private static bool IsValidFormFieldUiState(string uiState) =>
+        uiState is "vacio" or "cargando" or "error" or "lleno";
+
     private async Task<System.Data.Common.DbConnection> OpenWithConfigAdminContextAsync(
         Guid tenantId,
         CancellationToken ct)

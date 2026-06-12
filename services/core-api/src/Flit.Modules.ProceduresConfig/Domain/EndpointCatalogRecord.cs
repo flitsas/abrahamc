@@ -12,6 +12,7 @@ public sealed record EndpointCatalogRecord(
     string Method,
     string AuthType,
     JsonElement AuthConfig,
+    JsonElement FieldMapping,
     int TimeoutMs,
     bool IsActive,
     int RowVersion,

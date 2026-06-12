@@ -20,7 +20,8 @@ public static class InvokeCatalogEndpoint
         int? HttpStatus,
         bool Succeeded,
         bool RateLimited,
-        string? ResponsePreview = null);
+        string? ResponsePreview = null,
+        IReadOnlyDictionary<string, string?>? MappedFields = null);
 
     public static async Task<Flit.SharedKernel.Result<Response, EndpointCatalogError>> HandleAsync(
         Command command,
@@ -73,7 +74,10 @@ public static class InvokeCatalogEndpoint
         {
             responseBody = JsonRuleElements.Parse(
                 JsonSerializer.Serialize(new { error = ex.GetType().Name, message = ex.Message }));
+            succeeded = false;
         }
+
+        var mappedFields = FieldMappingTransformer.Transform(entry.FieldMapping, responseBody);
 
         await callLogRepo.LogAsync(
             new EndpointCallLogEntry(
@@ -94,7 +98,7 @@ public static class InvokeCatalogEndpoint
         }
 
         return Flit.SharedKernel.Result<Response, EndpointCatalogError>.Success(
-            new Response(code, httpStatus, succeeded, RateLimited: false, preview));
+            new Response(code, httpStatus, succeeded, RateLimited: false, preview, mappedFields));
     }
 
     private static HttpRequestMessage BuildHttpRequest(EndpointCatalogRecord entry, JsonElement payload)

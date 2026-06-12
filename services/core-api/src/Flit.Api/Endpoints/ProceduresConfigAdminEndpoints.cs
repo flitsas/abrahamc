@@ -1,4 +1,5 @@
 using Flit.Api.Auth;
+using Flit.Infrastructure.MultiTenant;
 using Flit.Modules.ProceduresConfig.Application;
 using Flit.Modules.ProceduresConfig.Ports;
 
@@ -68,6 +69,37 @@ public static class ProceduresConfigAdminEndpoints
         bool? IsOmitible,
         string? PersonKindFilter,
         int? DisplayOrder);
+
+    public sealed record CreateFormSectionRequest(
+        string SectionKey,
+        string Title,
+        int DisplayOrder,
+        string UiMode);
+
+    public sealed record PatchFormSectionRequest(
+        string? Title,
+        int? DisplayOrder,
+        string? UiMode);
+
+    public sealed record CreateFormFieldRequest(
+        string FieldKey,
+        string DataType,
+        string Label,
+        bool IsRequired,
+        int DisplayOrder,
+        string UiState,
+        bool IsTrigger,
+        string? ValidationJson,
+        string? OptionsJson);
+
+    public sealed record PatchFormFieldRequest(
+        string? Label,
+        bool? IsRequired,
+        int? DisplayOrder,
+        string? UiState,
+        bool? IsTrigger,
+        string? ValidationJson,
+        string? OptionsJson);
 
     public sealed record PatchRequiredDocumentRequest(
         string? EdgeCode,
@@ -380,9 +412,21 @@ public static class ProceduresConfigAdminEndpoints
             string code,
             PatchGlobalActiveRequest req,
             Guid tenantId,
+            ITenantContext tenantContext,
             IProceduresConfigAdminRepository repo,
             CancellationToken ct) =>
         {
+            if (UpdateAdminProcedureTypeGlobal.ValidateSuperAdmin(tenantContext.IsSuperAdmin) is not null)
+            {
+                return Results.Json(
+                    new
+                    {
+                        error = UpdateAdminProcedureTypeGlobal.ForbiddenNotSuperAdminCode,
+                        message = "Solo Super Administrador puede modificar la activación global del tipo de trámite.",
+                    },
+                    statusCode: StatusCodes.Status403Forbidden);
+            }
+
             if (tenantId == Guid.Empty)
             {
                 return Results.BadRequest(new { error = "tenantId es requerido." });
@@ -398,7 +442,8 @@ public static class ProceduresConfigAdminEndpoints
                 : Results.NotFound(new { error = $"Tipo '{code}' no encontrado." });
         })
         .RequireTramitesPermission(ManagePermission)
-        .WithName("PatchAdminProcedureGlobalActive");
+        .WithName("PatchAdminProcedureGlobalActive")
+        .WithSummary("Activa/desactiva tipo a nivel global — solo SuperAdmin (HU #9695)");
 
         group.MapPatch("/types/{code}", async (
             string code,
@@ -684,5 +729,210 @@ public static class ProceduresConfigAdminEndpoints
         })
         .RequireTramitesPermission(ManagePermission)
         .WithName("DeleteAdminQueryConfig");
+
+        group.MapGet("/types/{code}/edges/{edgeCode}/form", async (
+            string code,
+            string edgeCode,
+            Guid tenantId,
+            IProceduresConfigAdminRepository repo,
+            CancellationToken ct) =>
+        {
+            if (tenantId == Guid.Empty)
+            {
+                return Results.BadRequest(new { error = "tenantId es requerido." });
+            }
+
+            var form = await GetAdminEdgeForm.HandleAsync(
+                new GetAdminEdgeForm.Query(tenantId, code, edgeCode),
+                repo,
+                ct);
+
+            return form is null
+                ? Results.NotFound(new { error = $"Tipo '{code}' no encontrado." })
+                : Results.Ok(form);
+        })
+        .RequireTramitesPermission(ReadPermission)
+        .WithName("GetAdminEdgeForm");
+
+        group.MapPost("/types/{code}/edges/{edgeCode}/form/sections", async (
+            string code,
+            string edgeCode,
+            CreateFormSectionRequest req,
+            Guid tenantId,
+            IProceduresConfigAdminRepository repo,
+            CancellationToken ct) =>
+        {
+            if (tenantId == Guid.Empty)
+            {
+                return Results.BadRequest(new { error = "tenantId es requerido." });
+            }
+
+            var (ok, error) = await CreateAdminFormSection.HandleAsync(
+                new CreateFormSectionCommand(
+                    tenantId,
+                    code,
+                    edgeCode,
+                    req.SectionKey,
+                    req.Title,
+                    req.DisplayOrder,
+                    req.UiMode),
+                repo,
+                ct);
+
+            return error is not null
+                ? Results.BadRequest(new { error })
+                : Results.Created(
+                    $"/api/v1/procedures-config/admin/types/{code}/edges/{edgeCode}/form/sections/{ok!.Id}",
+                    ok);
+        })
+        .RequireTramitesPermission(ManagePermission)
+        .WithName("CreateAdminFormSection");
+
+        group.MapPatch("/types/{code}/form/sections/{sectionId:guid}", async (
+            string code,
+            Guid sectionId,
+            PatchFormSectionRequest req,
+            Guid tenantId,
+            IProceduresConfigAdminRepository repo,
+            CancellationToken ct) =>
+        {
+            if (tenantId == Guid.Empty)
+            {
+                return Results.BadRequest(new { error = "tenantId es requerido." });
+            }
+
+            var (ok, error) = await UpdateAdminFormSection.HandleAsync(
+                new UpdateFormSectionCommand(tenantId, code, sectionId, req.Title, req.DisplayOrder, req.UiMode),
+                repo,
+                ct);
+
+            return error is not null
+                ? Results.BadRequest(new { error })
+                : Results.Ok(ok);
+        })
+        .RequireTramitesPermission(ManagePermission)
+        .WithName("PatchAdminFormSection");
+
+        group.MapDelete("/types/{code}/form/sections/{sectionId:guid}", async (
+            string code,
+            Guid sectionId,
+            Guid tenantId,
+            IProceduresConfigAdminRepository repo,
+            CancellationToken ct) =>
+        {
+            if (tenantId == Guid.Empty)
+            {
+                return Results.BadRequest(new { error = "tenantId es requerido." });
+            }
+
+            var ok = await DeactivateAdminFormSection.HandleAsync(
+                new DeactivateAdminFormSection.Command(tenantId, code, sectionId),
+                repo,
+                ct);
+
+            return ok
+                ? Results.NoContent()
+                : Results.NotFound(new { error = "Sección no encontrada." });
+        })
+        .RequireTramitesPermission(ManagePermission)
+        .WithName("DeleteAdminFormSection");
+
+        group.MapPost("/types/{code}/form/sections/{sectionId:guid}/fields", async (
+            string code,
+            Guid sectionId,
+            CreateFormFieldRequest req,
+            Guid tenantId,
+            IProceduresConfigAdminRepository repo,
+            CancellationToken ct) =>
+        {
+            if (tenantId == Guid.Empty)
+            {
+                return Results.BadRequest(new { error = "tenantId es requerido." });
+            }
+
+            var (ok, error) = await CreateAdminFormField.HandleAsync(
+                new CreateFormFieldCommand(
+                    tenantId,
+                    code,
+                    sectionId,
+                    req.FieldKey,
+                    req.DataType,
+                    req.Label,
+                    req.IsRequired,
+                    req.DisplayOrder,
+                    req.UiState,
+                    req.IsTrigger,
+                    req.ValidationJson,
+                    req.OptionsJson),
+                repo,
+                ct);
+
+            return error is not null
+                ? Results.BadRequest(new { error })
+                : Results.Created(
+                    $"/api/v1/procedures-config/admin/types/{code}/form/fields/{ok!.Id}",
+                    ok);
+        })
+        .RequireTramitesPermission(ManagePermission)
+        .WithName("CreateAdminFormField");
+
+        group.MapPatch("/types/{code}/form/fields/{fieldId:guid}", async (
+            string code,
+            Guid fieldId,
+            PatchFormFieldRequest req,
+            Guid tenantId,
+            IProceduresConfigAdminRepository repo,
+            CancellationToken ct) =>
+        {
+            if (tenantId == Guid.Empty)
+            {
+                return Results.BadRequest(new { error = "tenantId es requerido." });
+            }
+
+            var (ok, error) = await UpdateAdminFormField.HandleAsync(
+                new UpdateFormFieldCommand(
+                    tenantId,
+                    code,
+                    fieldId,
+                    req.Label,
+                    req.IsRequired,
+                    req.DisplayOrder,
+                    req.UiState,
+                    req.IsTrigger,
+                    req.ValidationJson,
+                    req.OptionsJson),
+                repo,
+                ct);
+
+            return error is not null
+                ? Results.BadRequest(new { error })
+                : Results.Ok(ok);
+        })
+        .RequireTramitesPermission(ManagePermission)
+        .WithName("PatchAdminFormField");
+
+        group.MapDelete("/types/{code}/form/fields/{fieldId:guid}", async (
+            string code,
+            Guid fieldId,
+            Guid tenantId,
+            IProceduresConfigAdminRepository repo,
+            CancellationToken ct) =>
+        {
+            if (tenantId == Guid.Empty)
+            {
+                return Results.BadRequest(new { error = "tenantId es requerido." });
+            }
+
+            var ok = await DeactivateAdminFormField.HandleAsync(
+                new DeactivateAdminFormField.Command(tenantId, code, fieldId),
+                repo,
+                ct);
+
+            return ok
+                ? Results.NoContent()
+                : Results.NotFound(new { error = "Campo no encontrado." });
+        })
+        .RequireTramitesPermission(ManagePermission)
+        .WithName("DeleteAdminFormField");
     }
 }
