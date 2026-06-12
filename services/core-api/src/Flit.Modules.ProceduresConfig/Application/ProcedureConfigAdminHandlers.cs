@@ -52,6 +52,24 @@ public static class ListAdminCatalogFamilies
         repo.ListCatalogFamiliesAsync(ct);
 }
 
+public static class CreateAdminCatalogFamily
+{
+    public static Task<(AdminCatalogFamily? Ok, string? Error)> HandleAsync(
+        CreateCatalogFamilyCommand command,
+        IProceduresConfigAdminRepository repo,
+        CancellationToken ct = default) =>
+        repo.CreateCatalogFamilyAsync(command, ct);
+}
+
+public static class DeleteAdminCatalogFamily
+{
+    public static Task<(bool Ok, DeleteCatalogFamilyError? Error)> HandleAsync(
+        string familyCode,
+        IProceduresConfigAdminRepository repo,
+        CancellationToken ct = default) =>
+        repo.DeleteCatalogFamilyAsync(familyCode, ct);
+}
+
 public static class ListAdminCatalogEdges
 {
     public static Task<IReadOnlyList<AdminCatalogEdge>> HandleAsync(

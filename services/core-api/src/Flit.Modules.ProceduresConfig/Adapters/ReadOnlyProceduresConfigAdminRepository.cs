@@ -98,6 +98,18 @@ public sealed class ReadOnlyProceduresConfigAdminRepository(IProceduresConfigRea
     public Task<IReadOnlyList<AdminCatalogFamily>> ListCatalogFamiliesAsync(CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<AdminCatalogFamily>>([]);
 
+    public Task<(AdminCatalogFamily? Ok, string? Error)> CreateCatalogFamilyAsync(
+        CreateCatalogFamilyCommand command,
+        CancellationToken ct = default) =>
+        Task.FromResult<(AdminCatalogFamily?, string?)>((null, "Requiere PostgreSQL."));
+
+    public Task<(bool Ok, DeleteCatalogFamilyError? Error)> DeleteCatalogFamilyAsync(
+        string familyCode,
+        CancellationToken ct = default) =>
+        Task.FromResult<(bool, DeleteCatalogFamilyError?)>((false, new DeleteCatalogFamilyError(
+            DeleteCatalogFamilyErrorKind.NotFound,
+            "Requiere PostgreSQL.")));
+
     public Task<IReadOnlyList<AdminCatalogEdge>> ListCatalogEdgesAsync(CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<AdminCatalogEdge>>([]);
 

@@ -36,6 +36,8 @@ tags:
     description: Feature #9550 — HU #9689
   - name: Companies - RUNT Contingency
     description: Feature #9550 — HU #9690
+  - name: Procedures Config - Admin
+    description: Feature #9553 — HU #9692
   - name: RUNT
     description: Feature #9550 — HU #9690
 
@@ -705,6 +707,98 @@ paths:
       responses:
         "200":
           description: Resultado consulta con bitácora
+
+  /api/v1/procedures-config/admin/catalog/families:
+    get:
+      tags: [Procedures Config - Admin]
+      summary: Listar familias de trámites (HU #9692)
+      operationId: ListAdminCatalogFamilies
+      responses:
+        "200":
+          description: Catálogo de familias activas
+        "403":
+          description: Requiere modulo.parametrizacion.crud-total
+    post:
+      tags: [Procedures Config - Admin]
+      summary: Crear familia de trámites (HU #9692)
+      operationId: CreateAdminCatalogFamily
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, name]
+              properties:
+                code: { type: string }
+                name: { type: string }
+                displayOrder: { type: integer, default: 100 }
+      responses:
+        "201":
+          description: Familia creada
+        "409":
+          description: Código duplicado
+        "403":
+          description: Requiere modulo.parametrizacion.gestionar
+
+  /api/v1/procedures-config/admin/catalog/families/{code}:
+    delete:
+      tags: [Procedures Config - Admin]
+      summary: Eliminar familia de trámites (HU #9692)
+      operationId: DeleteAdminCatalogFamily
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Familia eliminada
+        "409":
+          description: FAMILY_IN_USE — tipos o instancias activas asociadas
+        "404":
+          description: Familia no encontrada
+        "403":
+          description: Requiere modulo.parametrizacion.gestionar
+
+  /api/v1/procedures-config/admin/types:
+    post:
+      tags: [Procedures Config - Admin]
+      summary: Crear tipo de trámite con pipeline mínimo 4 pasos (HU #9692)
+      operationId: CreateAdminProcedureType
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantId, familyCode, code, slug, name, maxSteps, edges]
+              properties:
+                tenantId: { type: string, format: uuid }
+                trafficAgencyId: { type: string, format: uuid, nullable: true }
+                familyCode: { type: string }
+                code: { type: string }
+                slug: { type: string }
+                name: { type: string }
+                maxSteps: { type: integer, minimum: 1, maximum: 4 }
+                edges:
+                  type: array
+                  items:
+                    type: object
+                    required: [edgeCode, isActive, isRequired, displayOrder]
+                    properties:
+                      edgeCode: { type: string }
+                      isActive: { type: boolean }
+                      isRequired: { type: boolean }
+                      displayOrder: { type: integer }
+                      roleLabel: { type: string, nullable: true }
+      responses:
+        "201":
+          description: Tipo creado con aristas en procedure_type_edges
+        "400":
+          description: Pipeline inválido (< 4 pasos activos excl. documentos)
+        "403":
+          description: Requiere modulo.parametrizacion.gestionar
 
 components:
   securitySchemes:

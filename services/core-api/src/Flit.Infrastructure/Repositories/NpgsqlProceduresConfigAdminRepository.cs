@@ -415,6 +415,168 @@ public sealed class NpgsqlProceduresConfigAdminRepository(FlitDbContext db) : IP
         return list;
     }
 
+    public async Task<(AdminCatalogFamily? Ok, string? Error)> CreateCatalogFamilyAsync(
+        CreateCatalogFamilyCommand command,
+        CancellationToken ct = default)
+    {
+        var code = command.Code.Trim().ToUpperInvariant();
+        var name = command.Name.Trim();
+
+        if (string.IsNullOrEmpty(code) || string.IsNullOrEmpty(name))
+        {
+            return (null, "Código y nombre son obligatorios.");
+        }
+
+        var conn = db.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open)
+        {
+            await conn.OpenAsync(ct);
+        }
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO procedures_config.procedure_families
+              (code, name, display_order, is_active, created_by, updated_by)
+            VALUES
+              (@code, @name, @display_order, TRUE, @user, @user)
+            RETURNING id, code, name, display_order
+            """;
+
+        cmd.Parameters.Add(new NpgsqlParameter("code", code));
+        cmd.Parameters.Add(new NpgsqlParameter("name", name));
+        cmd.Parameters.Add(new NpgsqlParameter("display_order", command.DisplayOrder));
+        AddGuidParam(cmd, "user", SystemUserId);
+
+        try
+        {
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            if (!await reader.ReadAsync(ct))
+            {
+                return (null, "No se pudo crear la familia.");
+            }
+
+            return (new AdminCatalogFamily(
+                reader.GetGuid(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetInt32(3)), null);
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            return (null, $"Ya existe la familia '{code}'.");
+        }
+    }
+
+    public async Task<(bool Ok, DeleteCatalogFamilyError? Error)> DeleteCatalogFamilyAsync(
+        string familyCode,
+        CancellationToken ct = default)
+    {
+        var code = familyCode.Trim().ToUpperInvariant();
+        if (string.IsNullOrEmpty(code))
+        {
+            return (false, new DeleteCatalogFamilyError(DeleteCatalogFamilyErrorKind.NotFound, "Código de familia inválido."));
+        }
+
+        var conn = db.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open)
+        {
+            await conn.OpenAsync(ct);
+        }
+
+        await using var tx = await conn.BeginTransactionAsync(ct);
+        try
+        {
+            Guid? familyId = null;
+            await using (var loadCmd = conn.CreateCommand())
+            {
+                loadCmd.Transaction = tx;
+                loadCmd.CommandText = """
+                    SELECT id
+                    FROM procedures_config.procedure_families
+                    WHERE code = @code
+                    LIMIT 1
+                    """;
+                loadCmd.Parameters.Add(new NpgsqlParameter("code", code));
+                var result = await loadCmd.ExecuteScalarAsync(ct);
+                if (result is not Guid g)
+                {
+                    await tx.RollbackAsync(ct);
+                    return (false, new DeleteCatalogFamilyError(
+                        DeleteCatalogFamilyErrorKind.NotFound,
+                        $"Familia '{code}' no encontrada."));
+                }
+
+                familyId = g;
+            }
+
+            await using (var typesCmd = conn.CreateCommand())
+            {
+                typesCmd.Transaction = tx;
+                typesCmd.CommandText = """
+                    SELECT 1
+                    FROM procedures_config.procedure_types
+                    WHERE family_id = @family_id
+                    LIMIT 1
+                    """;
+                typesCmd.Parameters.Add(new NpgsqlParameter("family_id", familyId.Value));
+                if (await typesCmd.ExecuteScalarAsync(ct) is not null)
+                {
+                    await tx.RollbackAsync(ct);
+                    return (false, new DeleteCatalogFamilyError(
+                        DeleteCatalogFamilyErrorKind.FamilyInUse,
+                        "FAMILY_IN_USE: existen tipos de trámite asociados a la familia."));
+                }
+            }
+
+            await using (var instancesCmd = conn.CreateCommand())
+            {
+                instancesCmd.Transaction = tx;
+                instancesCmd.CommandText = """
+                    SELECT 1
+                    FROM procedures.procedure_instances pi
+                    INNER JOIN procedures_config.procedure_types pt ON pt.id = pi.procedure_type_id
+                    WHERE pt.family_id = @family_id
+                      AND pi.deleted_at IS NULL
+                    LIMIT 1
+                    """;
+                instancesCmd.Parameters.Add(new NpgsqlParameter("family_id", familyId.Value));
+                if (await instancesCmd.ExecuteScalarAsync(ct) is not null)
+                {
+                    await tx.RollbackAsync(ct);
+                    return (false, new DeleteCatalogFamilyError(
+                        DeleteCatalogFamilyErrorKind.FamilyInUse,
+                        "FAMILY_IN_USE: existen instancias activas de trámites asociadas a la familia."));
+                }
+            }
+
+            await using (var deleteCmd = conn.CreateCommand())
+            {
+                deleteCmd.Transaction = tx;
+                deleteCmd.CommandText = """
+                    DELETE FROM procedures_config.procedure_families
+                    WHERE id = @family_id
+                    """;
+                deleteCmd.Parameters.Add(new NpgsqlParameter("family_id", familyId.Value));
+                var deleted = await deleteCmd.ExecuteNonQueryAsync(ct);
+                if (deleted == 0)
+                {
+                    await tx.RollbackAsync(ct);
+                    return (false, new DeleteCatalogFamilyError(
+                        DeleteCatalogFamilyErrorKind.NotFound,
+                        $"Familia '{code}' no encontrada."));
+                }
+            }
+
+            await tx.CommitAsync(ct);
+            return (true, null);
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
+    }
+
     public async Task<IReadOnlyList<AdminCatalogEdge>> ListCatalogEdgesAsync(CancellationToken ct = default)
     {
         var conn = db.Database.GetDbConnection();
@@ -466,13 +628,16 @@ public sealed class NpgsqlProceduresConfigAdminRepository(FlitDbContext db) : IP
             return (null, new CreateProcedureTypeError(CreateProcedureTypeErrorKind.Validation, "Debe activar al menos una arista en la matriz."));
         }
 
-        var activeCaptureEdges = activeMatrixEdges
-            .Where(e => e.EdgeCode != "documentos")
-            .ToList();
-        if (activeCaptureEdges.Count == 0)
+        var pipelineValidation = ProcedurePipelineValidator.ValidateMinActiveDataEdges(
+            command.Edges.Select(e => (e.EdgeCode, e.IsActive)));
+        if (!pipelineValidation.IsValid)
         {
-            return (null, new CreateProcedureTypeError(CreateProcedureTypeErrorKind.Validation, "Debe activar al menos una arista de datos (vehículo o actor)."));
+            return (null, new CreateProcedureTypeError(CreateProcedureTypeErrorKind.Validation, pipelineValidation.ErrorMessage!));
         }
+
+        var activeCaptureEdges = activeMatrixEdges
+            .Where(e => e.EdgeCode != ProcedurePipelineValidator.DocumentsEdgeCode)
+            .ToList();
 
         var computedMaxSteps = Math.Clamp(activeMatrixEdges.Count, 1, 4);
 

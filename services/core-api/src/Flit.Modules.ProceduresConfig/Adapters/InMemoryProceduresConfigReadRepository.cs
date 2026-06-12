@@ -342,6 +342,18 @@ public sealed class InMemoryProceduresConfigReadRepository
             new(Guid.Parse("00000000-0000-7000-8002-000000000001"), "TRASPASO", "Traspaso", 2),
         ]);
 
+    public Task<(AdminCatalogFamily? Ok, string? Error)> CreateCatalogFamilyAsync(
+        CreateCatalogFamilyCommand command,
+        CancellationToken ct = default) =>
+        Task.FromResult<(AdminCatalogFamily?, string?)>((null, "Requiere PostgreSQL."));
+
+    public Task<(bool Ok, DeleteCatalogFamilyError? Error)> DeleteCatalogFamilyAsync(
+        string familyCode,
+        CancellationToken ct = default) =>
+        Task.FromResult<(bool, DeleteCatalogFamilyError?)>((false, new DeleteCatalogFamilyError(
+            DeleteCatalogFamilyErrorKind.NotFound,
+            "Requiere PostgreSQL.")));
+
     public Task<IReadOnlyList<AdminCatalogEdge>> ListCatalogEdgesAsync(CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<AdminCatalogEdge>>(TraspasoEdges.Select(e =>
             new AdminCatalogEdge(e.Code, e.Name, e.EdgeKind, e.DisplayOrder)).ToList());

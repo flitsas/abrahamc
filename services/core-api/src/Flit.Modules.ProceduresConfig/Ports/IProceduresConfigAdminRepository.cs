@@ -79,6 +79,16 @@ public sealed record AdminProcedureMatrixView(
 
 public sealed record AdminCatalogFamily(Guid Id, string Code, string Name, int DisplayOrder);
 
+public sealed record CreateCatalogFamilyCommand(string Code, string Name, int DisplayOrder);
+
+public enum DeleteCatalogFamilyErrorKind
+{
+    NotFound,
+    FamilyInUse,
+}
+
+public sealed record DeleteCatalogFamilyError(DeleteCatalogFamilyErrorKind Kind, string Message);
+
 public sealed record AdminCatalogEdge(
     string Code,
     string Name,
@@ -167,6 +177,14 @@ public interface IProceduresConfigAdminRepository
         CancellationToken ct = default);
 
     Task<IReadOnlyList<AdminCatalogFamily>> ListCatalogFamiliesAsync(CancellationToken ct = default);
+
+    Task<(AdminCatalogFamily? Ok, string? Error)> CreateCatalogFamilyAsync(
+        CreateCatalogFamilyCommand command,
+        CancellationToken ct = default);
+
+    Task<(bool Ok, DeleteCatalogFamilyError? Error)> DeleteCatalogFamilyAsync(
+        string familyCode,
+        CancellationToken ct = default);
 
     Task<IReadOnlyList<AdminCatalogEdge>> ListCatalogEdgesAsync(CancellationToken ct = default);
 

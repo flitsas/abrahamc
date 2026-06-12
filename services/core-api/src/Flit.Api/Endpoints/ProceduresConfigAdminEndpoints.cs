@@ -1,11 +1,16 @@
+using Flit.Api.Auth;
 using Flit.Modules.ProceduresConfig.Application;
 using Flit.Modules.ProceduresConfig.Ports;
 
 namespace Flit.Api.Endpoints;
 
-/// <summary>Administración de parametrización de trámites (#9409) — PostgreSQL.</summary>
+/// <summary>Administración de parametrización de trámites (#9409, #9692) — PostgreSQL.</summary>
 public static class ProceduresConfigAdminEndpoints
 {
+    private const string ReadPermission = "modulo.parametrizacion.crud-total";
+    private const string ManagePermission = "modulo.parametrizacion.gestionar";
+    public sealed record CreateCatalogFamilyRequest(string Code, string Name, int? DisplayOrder);
+
     public sealed record PatchEdgeRequest(bool IsActive);
 
     public sealed record PatchTenantActivationRequest(bool IsActive);
@@ -84,7 +89,66 @@ public static class ProceduresConfigAdminEndpoints
             var items = await ListAdminCatalogFamilies.HandleAsync(repo, ct);
             return Results.Ok(new { items });
         })
+        .RequireTramitesPermission(ReadPermission)
         .WithName("ListAdminCatalogFamilies");
+
+        group.MapPost("/catalog/families", async (
+            CreateCatalogFamilyRequest req,
+            IProceduresConfigAdminRepository repo,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(req.Code) || string.IsNullOrWhiteSpace(req.Name))
+            {
+                return Results.BadRequest(new { error = "code y name son obligatorios." });
+            }
+
+            var (ok, error) = await CreateAdminCatalogFamily.HandleAsync(
+                new CreateCatalogFamilyCommand(
+                    req.Code.Trim().ToUpperInvariant(),
+                    req.Name.Trim(),
+                    req.DisplayOrder ?? 100),
+                repo,
+                ct);
+
+            if (error is not null)
+            {
+                return error.Contains("Ya existe", StringComparison.OrdinalIgnoreCase)
+                    ? Results.Conflict(new { error })
+                    : Results.BadRequest(new { error });
+            }
+
+            return Results.Created($"/api/v1/procedures-config/admin/catalog/families/{ok!.Code}", ok);
+        })
+        .RequireTramitesPermission(ManagePermission)
+        .WithName("CreateAdminCatalogFamily");
+
+        group.MapDelete("/catalog/families/{code}", async (
+            string code,
+            IProceduresConfigAdminRepository repo,
+            CancellationToken ct) =>
+        {
+            var (ok, error) = await DeleteAdminCatalogFamily.HandleAsync(
+                code.Trim().ToUpperInvariant(),
+                repo,
+                ct);
+
+            if (error is not null)
+            {
+                return error.Kind switch
+                {
+                    DeleteCatalogFamilyErrorKind.FamilyInUse => Results.Conflict(new
+                    {
+                        error = "FAMILY_IN_USE",
+                        message = error.Message,
+                    }),
+                    _ => Results.NotFound(new { error = error.Message }),
+                };
+            }
+
+            return ok ? Results.NoContent() : Results.NotFound(new { error = "Familia no encontrada." });
+        })
+        .RequireTramitesPermission(ManagePermission)
+        .WithName("DeleteAdminCatalogFamily");
 
         group.MapGet("/catalog/edges", async (
             IProceduresConfigAdminRepository repo,
@@ -93,6 +157,7 @@ public static class ProceduresConfigAdminEndpoints
             var items = await ListAdminCatalogEdges.HandleAsync(repo, ct);
             return Results.Ok(new { items });
         })
+        .RequireTramitesPermission(ReadPermission)
         .WithName("ListAdminCatalogEdges");
 
         group.MapGet("/catalog/document-types", async (
@@ -102,6 +167,7 @@ public static class ProceduresConfigAdminEndpoints
             var items = await ListAdminCatalogDocumentTypes.HandleAsync(repo, ct);
             return Results.Ok(new { items });
         })
+        .RequireTramitesPermission(ReadPermission)
         .WithName("ListAdminCatalogDocumentTypes");
 
         group.MapPost("/catalog/document-types", async (
@@ -139,6 +205,7 @@ public static class ProceduresConfigAdminEndpoints
 
             return Results.Created($"/api/v1/procedures-config/admin/catalog/document-types/{ok!.Code}", ok);
         })
+        .RequireTramitesPermission(ManagePermission)
         .WithName("CreateAdminCatalogDocumentType");
 
         group.MapPatch("/catalog/document-types/{code}", async (
@@ -167,6 +234,7 @@ public static class ProceduresConfigAdminEndpoints
                 ? Results.BadRequest(new { error })
                 : Results.Ok(ok);
         })
+        .RequireTramitesPermission(ManagePermission)
         .WithName("UpdateAdminCatalogDocumentType");
 
         group.MapDelete("/catalog/document-types/{code}", async (
@@ -190,6 +258,7 @@ public static class ProceduresConfigAdminEndpoints
                 ? Results.NoContent()
                 : Results.NotFound(new { error = "Documento no encontrado en catálogo." });
         })
+        .RequireTramitesPermission(ManagePermission)
         .WithName("DeactivateAdminCatalogDocumentType");
 
         group.MapGet("/types", async (
@@ -210,6 +279,7 @@ public static class ProceduresConfigAdminEndpoints
 
             return Results.Ok(new { items });
         })
+        .RequireTramitesPermission(ReadPermission)
         .WithName("ListAdminProcedureTypes");
 
         group.MapPost("/types", async (
@@ -254,6 +324,7 @@ public static class ProceduresConfigAdminEndpoints
 
             return Results.Created($"/api/v1/procedures-config/admin/types/{ok!.Code}/matrix", ok);
         })
+        .RequireTramitesPermission(ManagePermission)
         .WithName("CreateAdminProcedureType");
 
         group.MapGet("/types/{code}/matrix", async (
@@ -277,6 +348,7 @@ public static class ProceduresConfigAdminEndpoints
                 ? Results.NotFound(new { error = $"Tipo '{code}' no encontrado." })
                 : Results.Ok(matrix);
         })
+        .RequireTramitesPermission(ReadPermission)
         .WithName("GetAdminProcedureMatrix");
 
         group.MapPatch("/types/{code}/tenant-activation", async (
@@ -301,6 +373,7 @@ public static class ProceduresConfigAdminEndpoints
                 ? Results.Ok(new { code, tenantId, trafficAgencyId, isActive = req.IsActive })
                 : Results.NotFound(new { error = $"Tipo '{code}' no encontrado." });
         })
+        .RequireTramitesPermission(ManagePermission)
         .WithName("PatchAdminProcedureTenantActivation");
 
         group.MapPatch("/types/{code}/global-active", async (
@@ -324,6 +397,7 @@ public static class ProceduresConfigAdminEndpoints
                 ? Results.Ok(new { code, isActive = req.IsActive })
                 : Results.NotFound(new { error = $"Tipo '{code}' no encontrado." });
         })
+        .RequireTramitesPermission(ManagePermission)
         .WithName("PatchAdminProcedureGlobalActive");
 
         group.MapPatch("/types/{code}", async (
@@ -357,6 +431,7 @@ public static class ProceduresConfigAdminEndpoints
                 ? Results.Ok(new { code, name = req.Name, maxSteps = req.MaxSteps })
                 : Results.NotFound(new { error = $"Tipo '{code}' no encontrado." });
         })
+        .RequireTramitesPermission(ManagePermission)
         .WithName("PatchAdminProcedureType");
 
         group.MapPatch("/types/{code}/matrix/edges/{edgeCode}", async (
@@ -381,6 +456,7 @@ public static class ProceduresConfigAdminEndpoints
                 ? Results.Ok(new { code, edgeCode, isActive = req.IsActive })
                 : Results.NotFound(new { error = $"Tipo '{code}' o arista '{edgeCode}' no encontrada." });
         })
+        .RequireTramitesPermission(ManagePermission)
         .WithName("PatchAdminProcedureEdge");
 
         group.MapPost("/types/{code}/required-documents", async (
@@ -424,6 +500,7 @@ public static class ProceduresConfigAdminEndpoints
                 ? Results.BadRequest(new { error })
                 : Results.Created($"/api/v1/procedures-config/admin/types/{code}/required-documents/{ok!.Id}", ok);
         })
+        .RequireTramitesPermission(ManagePermission)
         .WithName("CreateAdminRequiredDocument");
 
         group.MapPatch("/types/{code}/required-documents/{documentId:guid}", async (
@@ -457,6 +534,7 @@ public static class ProceduresConfigAdminEndpoints
                 ? Results.BadRequest(new { error })
                 : Results.Ok(ok);
         })
+        .RequireTramitesPermission(ManagePermission)
         .WithName("PatchAdminRequiredDocument");
 
         group.MapDelete("/types/{code}/required-documents/{documentId:guid}", async (
@@ -480,6 +558,7 @@ public static class ProceduresConfigAdminEndpoints
                 ? Results.NoContent()
                 : Results.NotFound(new { error = "Documento no encontrado." });
         })
+        .RequireTramitesPermission(ManagePermission)
         .WithName("DeleteAdminRequiredDocument");
 
         group.MapGet("/catalog/query-connectors", async (
@@ -489,6 +568,7 @@ public static class ProceduresConfigAdminEndpoints
             var items = await ListAdminCatalogQueryConnectors.HandleAsync(repo, ct);
             return Results.Ok(new { items });
         })
+        .RequireTramitesPermission(ReadPermission)
         .WithName("ListAdminCatalogQueryConnectors");
 
         group.MapGet("/types/{code}/query-configs", async (
@@ -509,6 +589,7 @@ public static class ProceduresConfigAdminEndpoints
 
             return Results.Ok(new { items });
         })
+        .RequireTramitesPermission(ReadPermission)
         .WithName("ListAdminQueryConfigs");
 
         group.MapPost("/types/{code}/query-configs", async (
@@ -545,6 +626,7 @@ public static class ProceduresConfigAdminEndpoints
                 ? Results.BadRequest(new { error })
                 : Results.Created($"/api/v1/procedures-config/admin/types/{code}/query-configs/{ok!.Id}", ok);
         })
+        .RequireTramitesPermission(ManagePermission)
         .WithName("CreateAdminQueryConfig");
 
         group.MapPatch("/types/{code}/query-configs/{configId:guid}", async (
@@ -576,6 +658,7 @@ public static class ProceduresConfigAdminEndpoints
                 ? Results.BadRequest(new { error })
                 : Results.Ok(ok);
         })
+        .RequireTramitesPermission(ManagePermission)
         .WithName("PatchAdminQueryConfig");
 
         group.MapDelete("/types/{code}/query-configs/{configId:guid}", async (
@@ -599,6 +682,7 @@ public static class ProceduresConfigAdminEndpoints
                 ? Results.NoContent()
                 : Results.NotFound(new { error = "Configuración de consulta no encontrada." });
         })
+        .RequireTramitesPermission(ManagePermission)
         .WithName("DeleteAdminQueryConfig");
     }
 }
