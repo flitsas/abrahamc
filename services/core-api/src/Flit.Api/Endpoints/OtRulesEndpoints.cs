@@ -1,6 +1,8 @@
 using System.Text.Json;
+using Flit.Api.Auth;
 using Flit.Infrastructure.Persistence;
 using Flit.Modules.Companies.Application;
+using Flit.Modules.Identity.Ports;
 using Flit.Modules.Companies.Domain;
 using Flit.Modules.Companies.Ports;
 using Flit.SharedKernel;
@@ -49,8 +51,13 @@ public static class OtRulesEndpoints
             FlitDbContext db,
             IClock clock,
             ICompaniesSessionContext session,
+            ITokenIssuer tokenIssuer,
+            HttpContext ctx,
             CancellationToken ct) =>
         {
+            if (!OtEndpointAuth.CanManageRules(ctx, tokenIssuer, session))
+                return Results.Json(new { error = "Forbidden" }, statusCode: StatusCodes.Status403Forbidden);
+
             if (string.IsNullOrWhiteSpace(req.Name))
                 return Results.BadRequest(new { error = "name es requerido." });
 
@@ -87,8 +94,13 @@ public static class OtRulesEndpoints
             FlitDbContext db,
             IClock clock,
             ICompaniesSessionContext session,
+            ITokenIssuer tokenIssuer,
+            HttpContext ctx,
             CancellationToken ct) =>
         {
+            if (!OtEndpointAuth.CanManageRules(ctx, tokenIssuer, session))
+                return Results.Json(new { error = "Forbidden" }, statusCode: StatusCodes.Status403Forbidden);
+
             var actorId = session.ActorUserId ?? DefaultActorUserId;
 
             var cmd = new ToggleOtRule.Command(ruleId, agencyId, actorId);
@@ -106,8 +118,14 @@ public static class OtRulesEndpoints
         group.MapGet("/", async (
             Guid agencyId,
             IOtRuleRepository repo,
+            ICompaniesSessionContext session,
+            ITokenIssuer tokenIssuer,
+            HttpContext ctx,
             CancellationToken ct) =>
         {
+            if (!OtEndpointAuth.CanRead(ctx, tokenIssuer, session))
+                return Results.Json(new { error = "Forbidden" }, statusCode: StatusCodes.Status403Forbidden);
+
             var rules = await repo.ListByAgencyAsync(agencyId, ct);
             return Results.Ok(rules.Select(MapRuleListItem));
         })

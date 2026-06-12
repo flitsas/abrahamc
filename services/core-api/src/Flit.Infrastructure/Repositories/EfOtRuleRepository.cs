@@ -34,6 +34,23 @@ public sealed class EfOtRuleRepository(FlitDbContext db) : IOtRuleRepository
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<OtRule>> ListActiveByTriggerAsync(
+        Guid trafficAgencyId,
+        string triggerEvent,
+        CancellationToken ct = default)
+    {
+        return await db.OtRules
+            .AsNoTracking()
+            .Where(x =>
+                x.TrafficAgencyId == trafficAgencyId &&
+                x.DeletedAt == null &&
+                x.IsActive &&
+                x.TriggerEvent == triggerEvent)
+            .OrderBy(x => x.Priority)
+            .ThenBy(x => x.CreatedAt)
+            .ToListAsync(ct);
+    }
+
     public async Task AddAsync(OtRule rule, CancellationToken ct = default)
     {
         await db.OtRules.AddAsync(rule, ct);

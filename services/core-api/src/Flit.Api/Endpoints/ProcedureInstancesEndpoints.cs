@@ -1,5 +1,8 @@
+using Flit.Modules.Companies.Application;
+using IOtRuleRepository = Flit.Modules.Companies.Ports.IOtRuleRepository;
 using Flit.Modules.Integrations.Application;
 using Flit.Modules.Integrations.Ports;
+using Flit.SharedKernel;
 using Flit.Modules.ProceduresConfig.Application;
 using Flit.Modules.ProceduresConfig.Ports;
 using Flit.Modules.Procedures.Application;
@@ -322,6 +325,8 @@ public static class ProcedureInstancesEndpoints
             TransitionProcedureStateRequest req,
             IProcedureInstanceRepository instanceRepo,
             IProcedureStateHistoryRepository historyRepo,
+            IOtRuleRepository otRulesRepo,
+            IClock clock,
             CancellationToken ct) =>
         {
             if (req.TenantId == Guid.Empty)
@@ -330,6 +335,17 @@ public static class ProcedureInstancesEndpoints
                 return Results.BadRequest(new { error = "changedByUserId es requerido." });
             if (string.IsNullOrWhiteSpace(req.ToState))
                 return Results.BadRequest(new { error = "toState es requerido." });
+
+            var instance = await instanceRepo.GetByIdAsync(id, req.TenantId, ct);
+            if (instance is null)
+                return Results.NotFound(new { error = "Instancia de trámite no encontrada." });
+
+            var blockMessage = await OtRuleSubmitGuard.GetBlockMessageAsync(
+                instance, req.ToState, otRulesRepo, clock, ct);
+            if (blockMessage is not null)
+            {
+                return Results.Conflict(new { error = blockMessage, code = "OT_RULE_BLOCKED" });
+            }
 
             var result = await TransitionProcedureInstance.HandleAsync(
                 new TransitionProcedureInstance.Command(
