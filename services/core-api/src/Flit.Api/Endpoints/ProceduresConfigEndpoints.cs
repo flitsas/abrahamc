@@ -19,6 +19,12 @@ public static class ProceduresConfigEndpoints
         JsonDocument? ConfigSnapshot = null,
         Guid? ProcedureInstanceId = null);
 
+    public sealed record SimulateRulesRequest(
+        Guid TenantId,
+        Guid ProcedureTypeId,
+        Dictionary<string, string?> CapturedFields,
+        JsonDocument? ConfigSnapshot = null);
+
     public sealed record CreateEndpointRequest(
         Guid TenantId,
         string Code,
@@ -27,6 +33,7 @@ public static class ProceduresConfigEndpoints
         string Method,
         string AuthType,
         JsonElement AuthConfig,
+        JsonElement FieldMapping,
         int TimeoutMs = 5000,
         bool IsActive = true,
         Guid? ActorUserId = null);
@@ -38,6 +45,7 @@ public static class ProceduresConfigEndpoints
         string Method,
         string AuthType,
         JsonElement AuthConfig,
+        JsonElement FieldMapping,
         int TimeoutMs,
         bool IsActive,
         int RowVersion,
@@ -81,6 +89,7 @@ public static class ProceduresConfigEndpoints
             ICompaniesSessionContext session,
             IProcedureRulesRepository rulesRepo,
             IRuleEndpointInvoker endpointInvoker,
+            IRuleExecutionLogRepository executionLogRepo,
             CancellationToken ct) =>
         {
             if (!TramitesTenantScope.TryResolve(
@@ -98,6 +107,7 @@ public static class ProceduresConfigEndpoints
                     req.ProcedureInstanceId),
                 rulesRepo,
                 endpointInvoker,
+                executionLogRepo,
                 ct);
 
             return Results.Ok(new
@@ -123,6 +133,53 @@ public static class ProceduresConfigEndpoints
         .RequireTramitesPermission("modulo.tramites.ver")
         .WithName("EvaluateProcedureRules")
         .WithSummary("Evalúa reglas activas (o snapshot) y devuelve acciones");
+
+        rules.MapPost("/simulate", async (
+            SimulateRulesRequest req,
+            ITenantContext tenantContext,
+            ICompaniesSessionContext session,
+            IProcedureRulesRepository rulesRepo,
+            CancellationToken ct) =>
+        {
+            if (!TramitesTenantScope.TryResolve(
+                    tenantContext, session, req.TenantId, out var tenantId, out var tenantError))
+            {
+                return tenantError!;
+            }
+
+            var response = await SimulateProcedureRules.HandleAsync(
+                new SimulateProcedureRules.Query(
+                    tenantId,
+                    req.ProcedureTypeId,
+                    req.CapturedFields,
+                    req.ConfigSnapshot),
+                rulesRepo,
+                ct);
+
+            return Results.Ok(new
+            {
+                matchedRules = response.MatchedRules.Select(m => new
+                {
+                    ruleId = m.RuleId,
+                    ruleName = m.RuleName,
+                    priority = m.Priority,
+                    actions = m.Actions.Select(a => new { type = a.Type, @params = a.Params }),
+                }),
+                actions = response.Actions.Select(a => new { type = a.Type, @params = a.Params }),
+                conflicts = response.Conflicts.Select(c => new
+                {
+                    conflictType = c.ConflictType,
+                    target = c.Target,
+                    actionTypes = c.ActionTypes,
+                    ruleIds = c.RuleIds,
+                }),
+            });
+        })
+        .RequireTramitesAnyPermission(
+            "ui.parametrizacion.simular-reglas",
+            "modulo.parametrizacion.crud-total")
+        .WithName("SimulateProcedureRules")
+        .WithSummary("Simula evaluación de reglas sin persistir ni invocar endpoints (HU #9694)");
 
         rules.MapGet("/", async (
             Guid tenantId,
@@ -329,6 +386,7 @@ public static class ProceduresConfigEndpoints
                     req.Method,
                     req.AuthType,
                     req.AuthConfig,
+                    req.FieldMapping,
                     req.TimeoutMs,
                     req.IsActive,
                     actorId),
@@ -366,6 +424,7 @@ public static class ProceduresConfigEndpoints
                     req.Method,
                     req.AuthType,
                     req.AuthConfig,
+                    req.FieldMapping,
                     req.TimeoutMs,
                     req.IsActive,
                     req.RowVersion,

@@ -156,6 +156,7 @@ builder.Services.AddSingleton<Flit.Modules.ProceduresConfig.Adapters.InMemoryPro
         sp.GetRequiredService<Flit.Modules.ProceduresConfig.Adapters.InMemoryProcedureRulesCatalogRepository>()));
 builder.Services.AddSingleton<Flit.Modules.ProceduresConfig.Adapters.InMemoryEndpointCatalogRepository>();
 builder.Services.AddSingleton<Flit.Modules.ProceduresConfig.Adapters.InMemoryEndpointCallLogRepository>();
+builder.Services.AddSingleton<Flit.Modules.ProceduresConfig.Adapters.InMemoryRuleExecutionLogRepository>();
 
 if (!usePostgres)
 {
@@ -223,6 +224,8 @@ if (!usePostgres)
         sp.GetRequiredService<Flit.Modules.ProceduresConfig.Adapters.InMemoryEndpointCatalogRepository>());
     builder.Services.AddSingleton<Flit.Modules.ProceduresConfig.Ports.IEndpointCallLogRepository>(sp =>
         sp.GetRequiredService<Flit.Modules.ProceduresConfig.Adapters.InMemoryEndpointCallLogRepository>());
+    builder.Services.AddSingleton<Flit.Modules.ProceduresConfig.Ports.IRuleExecutionLogRepository>(sp =>
+        sp.GetRequiredService<Flit.Modules.ProceduresConfig.Adapters.InMemoryRuleExecutionLogRepository>());
     builder.Services.AddSingleton<Flit.Modules.ProceduresConfig.Ports.IRuleEndpointInvoker>(sp =>
         new Flit.Modules.ProceduresConfig.Application.CatalogRuleEndpointInvoker(
             sp.GetRequiredService<Flit.Modules.ProceduresConfig.Ports.IEndpointCatalogRepository>(),

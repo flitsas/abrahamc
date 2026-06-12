@@ -207,6 +207,8 @@ public static class InfrastructureExtensions
             NpgsqlProcedureRulesCatalogRepository>();
         services.AddScoped<Flit.Modules.ProceduresConfig.Ports.IEndpointCallLogRepository,
             NpgsqlEndpointCallLogRepository>();
+        services.AddScoped<Flit.Modules.ProceduresConfig.Ports.IRuleExecutionLogRepository,
+            NpgsqlRuleExecutionLogRepository>();
         services.AddScoped<Flit.Modules.ProceduresConfig.Ports.IEndpointCatalogRepository,
             NpgsqlEndpointCatalogRepository>();
         services.AddScoped<Flit.Modules.ProceduresConfig.Ports.IRuleEndpointInvoker,

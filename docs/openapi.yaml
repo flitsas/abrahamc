@@ -708,6 +708,77 @@ paths:
         "200":
           description: Resultado consulta con bitácora
 
+  /api/v1/procedures-config/rules/evaluate:
+    post:
+      tags: [Procedures Config - Rules]
+      summary: Evalúa reglas activas o snapshot y persiste bitácora (HU #9694 AC4)
+      operationId: EvaluateProcedureRules
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantId, procedureTypeId, capturedFields]
+              properties:
+                tenantId: { type: string, format: uuid }
+                procedureTypeId: { type: string, format: uuid }
+                capturedFields:
+                  type: object
+                  additionalProperties: { type: string, nullable: true }
+                configSnapshot: { type: object, nullable: true }
+                procedureInstanceId: { type: string, format: uuid, nullable: true }
+      responses:
+        "200":
+          description: Reglas coincidentes, acciones e invocaciones de endpoints
+        "403":
+          description: Requiere modulo.tramites.ver
+
+  /api/v1/procedures-config/rules/simulate:
+    post:
+      tags: [Procedures Config - Rules]
+      summary: Simula evaluación de reglas sin persistir ni invocar endpoints (HU #9694 AC2)
+      operationId: SimulateProcedureRules
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantId, procedureTypeId, capturedFields]
+              properties:
+                tenantId: { type: string, format: uuid }
+                procedureTypeId: { type: string, format: uuid }
+                capturedFields:
+                  type: object
+                  additionalProperties: { type: string, nullable: true }
+                configSnapshot: { type: object, nullable: true }
+      responses:
+        "200":
+          description: Reglas coincidentes, acciones y conflictos detectados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  matchedRules: { type: array }
+                  actions: { type: array }
+                  conflicts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        conflictType: { type: string }
+                        target: { type: string }
+                        actionTypes:
+                          type: array
+                          items: { type: string }
+                        ruleIds:
+                          type: array
+                          items: { type: string, format: uuid }
+        "403":
+          description: Requiere ui.parametrizacion.simular-reglas o modulo.parametrizacion.crud-total
+
   /api/v1/procedures-config/admin/catalog/families:
     get:
       tags: [Procedures Config - Admin]
@@ -799,6 +870,162 @@ paths:
           description: Pipeline inválido (< 4 pasos activos excl. documentos)
         "403":
           description: Requiere modulo.parametrizacion.gestionar
+
+  /api/v1/procedures/types/{code}/configuration:
+    get:
+      tags: [Procedures - Configuration]
+      summary: Configuración resuelta global→compañía→OT (HU #9695)
+      operationId: GetProcedureConfiguration
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+        - name: tenantId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: trafficAgencyId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Configuración efectiva con scope y resolutionLayers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  procedureTypeId: { type: string, format: uuid }
+                  code: { type: string }
+                  scope:
+                    type: string
+                    enum: [global, company, ot]
+                  resolutionLayers:
+                    type: array
+                    items:
+                      type: string
+                      enum: [global, company, ot]
+                  edges: { type: array, items: { type: object } }
+                  sections: { type: array, items: { type: object } }
+                  queries: { type: array, items: { type: object } }
+                  requiredDocuments: { type: array, items: { type: object } }
+        "404":
+          description: Tipo no encontrado o no activo para el tenant
+        "403":
+          description: Requiere modulo.tramites.ver
+
+  /api/v1/procedures-config/admin/types/{code}/global-active:
+    patch:
+      tags: [Procedures Config - Admin]
+      summary: Activar/desactivar tipo a nivel global — solo SuperAdmin (HU #9695)
+      operationId: PatchAdminProcedureGlobalActive
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+        - name: tenantId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isActive]
+              properties:
+                isActive: { type: boolean }
+      responses:
+        "200":
+          description: Activación global actualizada
+        "403":
+          description: SUPER_ADMIN_REQUIRED — solo Super Administrador
+        "404":
+          description: Tipo no encontrado
+        "400":
+          description: tenantId requerido
+
+  /api/v1/procedures-config/admin/types/{code}/edges/{edgeCode}/form:
+    get:
+      tags: [Procedures Config - Admin]
+      summary: Formulario dinámico por arista (HU #9693)
+      operationId: GetAdminEdgeForm
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+        - name: edgeCode
+          in: path
+          required: true
+          schema: { type: string }
+        - name: tenantId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Secciones y campos del formulario
+        "404":
+          description: Tipo no encontrado
+        "403":
+          description: Requiere modulo.parametrizacion.crud-total
+
+  /api/v1/procedures-config/admin/types/{code}/edges/{edgeCode}/form/sections:
+    post:
+      tags: [Procedures Config - Admin]
+      summary: Crear sección de formulario (HU #9693)
+      operationId: CreateAdminFormSection
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+        - name: edgeCode
+          in: path
+          required: true
+          schema: { type: string }
+        - name: tenantId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sectionKey, title, displayOrder, uiMode]
+              properties:
+                sectionKey: { type: string }
+                title: { type: string }
+                displayOrder: { type: integer }
+                uiMode: { type: string, enum: [read_only, interactive] }
+      responses:
+        "201":
+          description: Sección creada
+        "400":
+          description: Validación fallida
+        "403":
+          description: Requiere modulo.parametrizacion.gestionar
+
+  /api/v1/procedures-config/endpoints:
+    get:
+      tags: [Procedures Config - Endpoint Catalog]
+      summary: Listar catálogo de endpoints externos (HU #9693 field_mapping)
+      operationId: ListEndpointCatalog
+      parameters:
+        - name: tenantId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Incluye field_mapping por endpoint
 
 components:
   securitySchemes:

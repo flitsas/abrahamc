@@ -184,4 +184,45 @@ public sealed class ReadOnlyProceduresConfigAdminRepository(IProceduresConfigRea
         Guid queryConfigId,
         CancellationToken ct = default) =>
         Task.FromResult(false);
+
+    public Task<AdminEdgeFormView?> GetFormByEdgeAsync(
+        Guid tenantId,
+        string procedureTypeCode,
+        string edgeCode,
+        CancellationToken ct = default) =>
+        Task.FromResult<AdminEdgeFormView?>(null);
+
+    public Task<(AdminFormSectionItem? Ok, string? Error)> CreateFormSectionAsync(
+        CreateFormSectionCommand command,
+        CancellationToken ct = default) =>
+        Task.FromResult<(AdminFormSectionItem?, string?)>((null, "Requiere PostgreSQL."));
+
+    public Task<(AdminFormSectionItem? Ok, string? Error)> UpdateFormSectionAsync(
+        UpdateFormSectionCommand command,
+        CancellationToken ct = default) =>
+        Task.FromResult<(AdminFormSectionItem?, string?)>((null, "Requiere PostgreSQL."));
+
+    public Task<bool> DeactivateFormSectionAsync(
+        Guid tenantId,
+        string procedureTypeCode,
+        Guid sectionId,
+        CancellationToken ct = default) =>
+        Task.FromResult(false);
+
+    public Task<(AdminFormFieldItem? Ok, string? Error)> CreateFormFieldAsync(
+        CreateFormFieldCommand command,
+        CancellationToken ct = default) =>
+        Task.FromResult<(AdminFormFieldItem?, string?)>((null, "Requiere PostgreSQL."));
+
+    public Task<(AdminFormFieldItem? Ok, string? Error)> UpdateFormFieldAsync(
+        UpdateFormFieldCommand command,
+        CancellationToken ct = default) =>
+        Task.FromResult<(AdminFormFieldItem?, string?)>((null, "Requiere PostgreSQL."));
+
+    public Task<bool> DeactivateFormFieldAsync(
+        Guid tenantId,
+        string procedureTypeCode,
+        Guid fieldId,
+        CancellationToken ct = default) =>
+        Task.FromResult(false);
 }
