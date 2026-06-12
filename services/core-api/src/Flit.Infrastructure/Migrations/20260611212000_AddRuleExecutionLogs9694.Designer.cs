@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Flit.Infrastructure.Migrations
 {
     [DbContext(typeof(FlitDbContext))]
-    [Migration("20260611210000_AddEndpointCatalogFieldMapping9693")]
-    partial class AddEndpointCatalogFieldMapping9693
+    [Migration("20260611212000_AddRuleExecutionLogs9694")]
+    partial class AddRuleExecutionLogs9694
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
