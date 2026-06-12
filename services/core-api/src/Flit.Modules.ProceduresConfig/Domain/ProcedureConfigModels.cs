@@ -61,6 +61,8 @@ public sealed record ResolvedProcedureConfiguration(
     string Name,
     string FamilyCode,
     int MaxSteps,
+    /// <summary>Capa efectiva de gobernanza: global, company u ot (HU #9695).</summary>
+    string Scope,
     IReadOnlyList<string> ResolutionLayers,
     IReadOnlyList<ProcedureEdgeConfig> Edges,
     IReadOnlyList<ProcedureFormSectionConfig> Sections,

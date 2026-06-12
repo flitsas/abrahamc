@@ -61,6 +61,7 @@ public static class RecordProcedureFiling
             procedureTypeId = command.Config.ProcedureTypeId,
             familyCode = command.Config.FamilyCode,
             maxSteps = command.Config.MaxSteps,
+            scope = command.Config.Scope,
             resolutionLayers = command.Config.ResolutionLayers,
             edges = command.Config.Edges.Select(e => new
             {

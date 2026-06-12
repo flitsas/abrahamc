@@ -18,18 +18,30 @@ public static class ProcedureConfigurationResolver
             return null;
         }
 
-        var layers = new List<string> { "global", "tenant" };
+        var layers = new List<string> { "global", "company" };
         var edges = bundle.Edges.Select(CloneEdge).ToList();
         var sections = bundle.Sections.Select(CloneSection).ToList();
         var queries = bundle.Queries.Select(CloneQuery).ToList();
 
         ApplyTenantOverrides(edges, sections, bundle.TenantActivation.OverridesJson);
 
+        var hasCompanyOverrides = HasMeaningfulOverrides(bundle.TenantActivation.OverridesJson);
+
         if (bundle.OtActivation is not null)
         {
             layers.Add("ot");
             ApplyOtOverrides(queries, bundle.OtActivation.OverridesJson);
         }
+        else if (hasCompanyOverrides)
+        {
+            layers[^1] = "company";
+        }
+        else
+        {
+            layers.RemoveAt(layers.Count - 1);
+        }
+
+        var scope = ResolveEffectiveScope(layers);
 
         edges = edges.Where(e => e.IsActive).OrderBy(e => e.DisplayOrder).ToList();
         sections = sections
@@ -44,12 +56,33 @@ public static class ProcedureConfigurationResolver
             bundle.Name,
             bundle.FamilyCode,
             bundle.MaxSteps,
+            scope,
             layers,
             edges,
             sections,
             queries.OrderBy(q => q.DisplayOrder).ToList(),
             bundle.RequiredDocuments);
     }
+
+    /// <summary>Capa más específica aplicada: ot &gt; company &gt; global (HU #9695 AC3).</summary>
+    internal static string ResolveEffectiveScope(IReadOnlyList<string> layers)
+    {
+        if (layers.Count == 0)
+        {
+            return "global";
+        }
+
+        return layers[^1] switch
+        {
+            "ot" => "ot",
+            "company" => "company",
+            _ => "global",
+        };
+    }
+
+    private static bool HasMeaningfulOverrides(string overridesJson) =>
+        !string.IsNullOrWhiteSpace(overridesJson) &&
+        overridesJson.Trim() is not ("{}" or "null");
 
     private static void ApplyTenantOverrides(
         List<ProcedureEdgeConfig> edges,

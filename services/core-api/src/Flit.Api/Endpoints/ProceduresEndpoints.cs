@@ -65,7 +65,7 @@ public static class ProceduresEndpoints
         })
         .RequireTramitesPermission("modulo.tramites.ver")
         .WithName("GetProcedureConfiguration")
-        .WithSummary("Configuración resuelta global→tenant→OT");
+        .WithSummary("Configuración resuelta global→compañía→OT con scope y resolutionLayers (HU #9695)");
 
         group.MapPost("/types/{code}/actors/incorporate", async (
             string code,
