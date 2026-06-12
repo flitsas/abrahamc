@@ -8,6 +8,10 @@ export const PERMISSIONS = {
   viewParametrizacion: "modulo.parametrizacion.crud-total",
   manageParametrizacion: "modulo.parametrizacion.gestionar",
   simulateParametrizacionRules: "ui.parametrizacion.simular-reglas",
+  otOperator: "modulo.ot.operador",
+  otAdminister: "modulo.ot.administrar",
+  otReorderDocuments: "ui.ot.reordenar-documentos",
+  otManageRules: "modulo.ot.gestionar-reglas",
 } as const;
 
 export type PermissionSlug =

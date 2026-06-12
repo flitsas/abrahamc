@@ -33,6 +33,21 @@ export const queryKeys = {
       ["companies-admin", "authorized-agencies", tenantId] as const,
     otCatalog: ["companies-admin", "ot-catalog"] as const,
   },
+  otAdmin: {
+    agencies: (params: { q?: string; page?: number; pageSize?: number }) =>
+      ["ot-admin", "agencies", params] as const,
+    agency: (agencyId: string) => ["ot-admin", "agency", agencyId] as const,
+    dashboard: (agencyId: string) =>
+      ["ot-admin", "dashboard", agencyId] as const,
+    consolidatedOrder: (agencyId: string) =>
+      ["ot-admin", "consolidated-order", agencyId] as const,
+    rules: (agencyId: string) => ["ot-admin", "rules", agencyId] as const,
+    integrationLogs: (params: {
+      trafficAgencyId: string;
+      page?: number;
+      pageSize?: number;
+    }) => ["ot-admin", "integration-logs", params] as const,
+  },
   parametrizadorAdmin: {
     families: ["parametrizador-admin", "families"] as const,
     catalogEdges: ["parametrizador-admin", "catalog-edges"] as const,

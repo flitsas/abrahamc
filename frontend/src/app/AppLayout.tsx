@@ -7,6 +7,7 @@ import { HomePage } from "../features/home/pages/HomePage.js";
 import { UsersAdminPage } from "../features/identity-admin/pages/UsersAdminPage.js";
 import { CompaniesAdminPage } from "../features/companies-admin/pages/CompaniesAdminPage.js";
 import { ParametrizacionAdminPage } from "../features/parametrizador-admin/pages/ParametrizacionAdminPage.js";
+import { OtTramitesConsolePage } from "../features/ot-admin/pages/OtTramitesConsolePage.js";
 import { ProceduresPage } from "../features/procedures/pages/ProceduresPage.js";
 import { AppShell } from "../shared/components/flit/AppShell.js";
 
@@ -106,6 +107,27 @@ const PARAMETRIZACION_NAV_ITEM: NavItem = {
   ),
 };
 
+const OT_TRAMITES_NAV_ITEM: NavItem = {
+  id: "ot-tramites",
+  to: "/admin/ot/tramites",
+  label: "Consola OT",
+  icon: (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h7M14 12h7M14 16h7" />
+    </svg>
+  ),
+};
+
 const COMPANIES_NAV_ITEM: NavItem = {
   id: "companies",
   to: "/admin/companies",
@@ -131,6 +153,7 @@ function useAppNavItems(): NavItem[] {
   const canManageUsers = usePermission(PERMISSIONS.manageUsers);
   const canViewCompanies = usePermission(PERMISSIONS.viewCompanies);
   const canViewParametrizacion = usePermission(PERMISSIONS.viewParametrizacion);
+  const canOperateOt = usePermission(PERMISSIONS.otOperator);
   const items = [...BASE_NAV_ITEMS];
   if (canManageUsers) {
     items.push(USERS_NAV_ITEM);
@@ -140,6 +163,9 @@ function useAppNavItems(): NavItem[] {
   }
   if (canViewParametrizacion) {
     items.push(PARAMETRIZACION_NAV_ITEM);
+  }
+  if (canOperateOt) {
+    items.push(OT_TRAMITES_NAV_ITEM);
   }
   return items;
 }
@@ -162,6 +188,8 @@ export function AppLayout({ previewPath }: AppLayoutProps) {
           <CompaniesAdminPage />
         ) : previewPath === "/admin/parametrizacion" ? (
           <ParametrizacionAdminPage />
+        ) : previewPath.startsWith("/admin/ot") ? (
+          <OtTramitesConsolePage />
         ) : (
           <HomePage />
         )}
@@ -197,6 +225,22 @@ export function AppLayout({ previewPath }: AppLayoutProps) {
               permission={PERMISSIONS.viewParametrizacion}
             >
               <ParametrizacionAdminPage />
+            </RequirePermissionRoute>
+          }
+        />
+        <Route
+          path="/admin/ot/tramites"
+          element={
+            <RequirePermissionRoute permission={PERMISSIONS.otOperator}>
+              <OtTramitesConsolePage />
+            </RequirePermissionRoute>
+          }
+        />
+        <Route
+          path="/admin/ot/:agencyId/tramites"
+          element={
+            <RequirePermissionRoute permission={PERMISSIONS.otOperator}>
+              <OtTramitesConsolePage />
             </RequirePermissionRoute>
           }
         />
