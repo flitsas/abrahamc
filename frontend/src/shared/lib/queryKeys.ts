@@ -12,6 +12,21 @@ export const queryKeys = {
   },
   procedures: {
     types: (tenantId: string) => ["procedures", "types", tenantId] as const,
+    instances: (params: {
+      tenantId: string;
+      page: number;
+      pageSize: number;
+      state?: string;
+      procedureTypeCode?: string;
+    }) => ["procedures", "instances", params] as const,
+    configuration: (typeCode: string, tenantId: string) =>
+      ["procedures", "configuration", typeCode, tenantId] as const,
+    queryResults: (instanceId: string, tenantId: string) =>
+      ["procedures", "query-results", instanceId, tenantId] as const,
+    ownershipValidate: (instanceId: string, tenantId: string) =>
+      ["procedures", "ownership-validate", instanceId, tenantId] as const,
+    instanceDetail: (instanceId: string, tenantId: string) =>
+      ["procedures", "instance-detail", instanceId, tenantId] as const,
   },
   identityAdmin: {
     users: (params: {

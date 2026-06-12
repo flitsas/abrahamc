@@ -1,4 +1,6 @@
 export const PERMISSIONS = {
+  viewTramites: "modulo.tramites.ver",
+  tramitesMaestro: "tramites.admin.maestro",
   manageUsers: "modulo.identidad.gestionar-usuarios",
   generateConsolidated: "ui.tramites.generar-consolidado",
   viewCompanies: "modulo.companias.ver",

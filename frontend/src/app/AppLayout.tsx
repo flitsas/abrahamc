@@ -9,6 +9,7 @@ import { CompaniesAdminPage } from "../features/companies-admin/pages/CompaniesA
 import { ParametrizacionAdminPage } from "../features/parametrizador-admin/pages/ParametrizacionAdminPage.js";
 import { OtTramitesConsolePage } from "../features/ot-admin/pages/OtTramitesConsolePage.js";
 import { ProceduresPage } from "../features/procedures/pages/ProceduresPage.js";
+import { ProcedureWizardPage } from "../features/procedures/pages/ProcedureWizardPage.js";
 import { AppShell } from "../shared/components/flit/AppShell.js";
 
 type NavItem = {
@@ -150,11 +151,15 @@ const COMPANIES_NAV_ITEM: NavItem = {
 };
 
 function useAppNavItems(): NavItem[] {
+  const canViewTramites = usePermission(PERMISSIONS.viewTramites);
   const canManageUsers = usePermission(PERMISSIONS.manageUsers);
   const canViewCompanies = usePermission(PERMISSIONS.viewCompanies);
   const canViewParametrizacion = usePermission(PERMISSIONS.viewParametrizacion);
   const canOperateOt = usePermission(PERMISSIONS.otOperator);
-  const items = [...BASE_NAV_ITEMS];
+  const items: NavItem[] = [BASE_NAV_ITEMS[0]];
+  if (canViewTramites) {
+    items.push(BASE_NAV_ITEMS[1]);
+  }
   if (canManageUsers) {
     items.push(USERS_NAV_ITEM);
   }
@@ -201,7 +206,30 @@ export function AppLayout({ previewPath }: AppLayoutProps) {
     <AppShell navItems={navItems}>
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/tramites" element={<ProceduresPage />} />
+        <Route
+          path="/tramites"
+          element={
+            <RequirePermissionRoute permission={PERMISSIONS.viewTramites}>
+              <ProceduresPage />
+            </RequirePermissionRoute>
+          }
+        />
+        <Route
+          path="/tramites/nuevo/:typeCode"
+          element={
+            <RequirePermissionRoute permission={PERMISSIONS.viewTramites}>
+              <ProcedureWizardPage mode="new" />
+            </RequirePermissionRoute>
+          }
+        />
+        <Route
+          path="/tramites/:instanceId"
+          element={
+            <RequirePermissionRoute permission={PERMISSIONS.viewTramites}>
+              <ProcedureWizardPage mode="continue" />
+            </RequirePermissionRoute>
+          }
+        />
         <Route
           path="/admin/usuarios"
           element={
