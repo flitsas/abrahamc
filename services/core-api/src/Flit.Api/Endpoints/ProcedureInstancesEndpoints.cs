@@ -1,29 +1,40 @@
+using Flit.Api.Auth;
+using Flit.Api.Services;
+using Flit.Infrastructure.MultiTenant;
+using ITenantContext = Flit.Infrastructure.MultiTenant.ITenantContext;
 using Flit.Modules.Companies.Application;
 using IOtRuleRepository = Flit.Modules.Companies.Ports.IOtRuleRepository;
+using Flit.Modules.Companies.Ports;
 using Flit.Modules.Integrations.Application;
+using IRuntSyncLogRepository = Flit.Modules.Integrations.Ports.IRuntSyncLogRepository;
 using Flit.Modules.Integrations.Ports;
-using Flit.SharedKernel;
 using Flit.Modules.ProceduresConfig.Application;
 using Flit.Modules.ProceduresConfig.Ports;
 using Flit.Modules.Procedures.Application;
 using Flit.Modules.Procedures.Domain;
 using Flit.Modules.Procedures.Ports;
+using Flit.SharedKernel;
 
 namespace Flit.Api.Endpoints;
 
 /// <summary>
-/// HU TRA-02 #9434 — Radicación de trámite con snapshot inmutable de configuración (ADR-0010).
+/// HU TRA-02 #9434 + Feature #9732 (#10079/#10080/#10081) — runtime de trámites con RBAC.
 /// </summary>
 public static class ProcedureInstancesEndpoints
 {
+    private const string ViewPermission = "modulo.tramites.ver";
+    private const string ManagePermission = "modulo.tramites.crud-total";
+    private const string SuperMaestroPermission = "tramites.admin.maestro";
+
     public static void MapProcedureInstancesEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/procedures/instances")
             .WithTags("Procedures - Runtime");
 
-        // POST /api/v1/procedures/instances
         group.MapPost("/", async (
             CreateProcedureInstanceRequest req,
+            ITenantContext tenantContext,
+            ICompaniesSessionContext session,
             IProceduresConfigReadRepository configRepo,
             IProcedureFilingAuditPort auditPort,
             IProcedureInstanceRepository instanceRepo,
@@ -33,19 +44,24 @@ public static class ProcedureInstancesEndpoints
             IDocumentTypesReadRepository documentTypesRepo,
             CancellationToken ct) =>
         {
-            if (req.TenantId == Guid.Empty)
-                return Results.BadRequest(new { error = "tenantId es requerido." });
-            if (req.FiledByUserId == Guid.Empty)
-                return Results.BadRequest(new { error = "filedByUserId es requerido." });
+            if (!TramitesTenantScope.TryResolve(
+                    tenantContext, session, req.TenantId, out var effectiveTenantId, out var tenantError))
+            {
+                return tenantError!;
+            }
+
+            var filedByUserId = req.FiledByUserId == Guid.Empty
+                ? TramitesTenantScope.ResolveActorUserId(session)
+                : req.FiledByUserId;
+
             if (string.IsNullOrWhiteSpace(req.ProcedureTypeCode))
                 return Results.BadRequest(new { error = "procedureTypeCode es requerido." });
             if (string.IsNullOrWhiteSpace(req.EdgeCode))
                 return Results.BadRequest(new { error = "edgeCode es requerido." });
 
-            // 1. Resolver configuración global → tenant → OT (ProceduresConfig)
             var config = await GetProcedureConfiguration.HandleAsync(
                 new GetProcedureConfiguration.Query(
-                    req.TenantId, req.ProcedureTypeCode, req.TrafficAgencyId),
+                    effectiveTenantId, req.ProcedureTypeCode, req.TrafficAgencyId),
                 configRepo, ct);
 
             if (config is null)
@@ -55,11 +71,10 @@ public static class ProcedureInstancesEndpoints
                     code = "PROCEDURE_TYPE_NOT_FOUND",
                 });
 
-            // 2. Validar reglas Leasing/Locatario + construir config_snapshot ADR-0010
             var (filingRecord, filingError) = await RecordProcedureFiling.HandleAsync(
                 new RecordProcedureFiling.Command(
-                    req.TenantId,
-                    req.FiledByUserId,
+                    effectiveTenantId,
+                    filedByUserId,
                     req.ProcedureTypeCode,
                     req.TrafficAgencyId,
                     req.EdgeCode,
@@ -70,14 +85,13 @@ public static class ProcedureInstancesEndpoints
             if (filingError is not null)
                 return MapFilingError(filingError);
 
-            // 3. Persistir procedure_instance con snapshot inmutable (TRA-02)
             var (instance, instanceError) = await FileProcedureInstance.HandleAsync(
                 new FileProcedureInstance.Command(
-                    TenantId: req.TenantId,
+                    TenantId: effectiveTenantId,
                     ProcedureTypeId: config.ProcedureTypeId,
                     TrafficAgencyId: req.TrafficAgencyId,
                     ProcedureTypeCode: req.ProcedureTypeCode,
-                    FiledByUserId: req.FiledByUserId,
+                    FiledByUserId: filedByUserId,
                     ConfigSnapshotJson: filingRecord!.ConfigSnapshotJson),
                 instanceRepo, ct);
 
@@ -85,9 +99,9 @@ public static class ProcedureInstancesEndpoints
                 return Results.Problem(instanceError.Message);
 
             await SaveProcedureFieldValues.HandleAsync(
-                req.TenantId,
+                effectiveTenantId,
                 instance!.Id,
-                req.FiledByUserId,
+                filedByUserId,
                 edgeRole: null,
                 req.FieldValues,
                 fieldValueRepo,
@@ -96,9 +110,9 @@ public static class ProcedureInstancesEndpoints
             var documentTypeCode = string.IsNullOrWhiteSpace(req.DocumentTypeCode) ? "CC" : req.DocumentTypeCode;
             var capture = await SaveProcedureRuntimeCapture.HandleAsync(
                 new SaveProcedureRuntimeCapture.Command(
-                    req.TenantId,
+                    effectiveTenantId,
                     instance.Id,
-                    req.FiledByUserId,
+                    filedByUserId,
                     req.ProcedureTypeCode,
                     req.TrafficAgencyId,
                     req.EdgeCode,
@@ -112,13 +126,14 @@ public static class ProcedureInstancesEndpoints
                 ct);
 
             return Results.Created(
-                $"/api/v1/procedures/instances/{instance!.Id}",
+                $"/api/v1/procedures/instances/{instance.Id}",
                 new ProcedureInstanceResponse(
                     instance.Id,
                     instance.TenantId,
                     instance.ProcedureTypeId,
                     req.ProcedureTypeCode,
                     instance.TrafficAgencyId,
+                    instance.ReferenceNumber,
                     instance.ReferenceNumber,
                     instance.State,
                     instance.ConfigSchemaVersion,
@@ -128,57 +143,102 @@ public static class ProcedureInstancesEndpoints
                     capture.VehicleId,
                     capture.PrimaryActorEdgeRole));
         })
+        .RequireTramitesPermission(ManagePermission)
         .WithName("CreateProcedureInstance")
         .WithSummary("Radica un trámite con snapshot de configuración inmutable (TRA-02 #9434)");
 
-        // GET /api/v1/procedures/instances — listado por tenant (dashboard TRA-04 / #9369)
         group.MapGet("/", async (
             Guid tenantId,
+            int? page,
+            int? pageSize,
+            string? state,
+            string? procedureTypeCode,
+            ITenantContext tenantContext,
+            ICompaniesSessionContext session,
             IProcedureInstanceRepository instanceRepo,
             CancellationToken ct) =>
         {
-            if (tenantId == Guid.Empty)
-                return Results.BadRequest(new { error = "tenantId es requerido." });
+            if (!TramitesTenantScope.TryResolve(
+                    tenantContext, session, tenantId, out var effectiveTenantId, out var tenantError))
+            {
+                return tenantError!;
+            }
 
-            var instances = await instanceRepo.ListByTenantAsync(tenantId, ct);
+            var result = await ListProcedureInstances.HandleAsync(
+                new ListProcedureInstances.Query(
+                    effectiveTenantId,
+                    page ?? 1,
+                    pageSize ?? 20,
+                    state,
+                    procedureTypeCode),
+                instanceRepo,
+                ct);
+
             return Results.Ok(new
             {
-                items = instances.Select(i => new ProcedureInstanceListItem(
+                items = result.Items.Select(i => new
+                {
                     i.Id,
+                    compositeId = i.CompositeId,
                     i.ReferenceNumber,
+                    i.ProcedureTypeCode,
                     i.State,
                     i.ProcedureTypeId,
                     i.TrafficAgencyId,
                     i.RadicatedAt,
                     i.CreatedAt,
-                    i.CreatedBy)).ToList(),
+                    i.CreatedBy,
+                }),
+                totalCount = result.TotalCount,
+                page = result.Page,
+                pageSize = result.PageSize,
             });
         })
+        .RequireTramitesPermission(ViewPermission)
         .WithName("ListProcedureInstances")
-        .WithSummary("Lista instancias radicadas del tenant (dashboard operador)");
+        .WithSummary("Lista instancias paginadas con ID compuesto (#10079)");
 
-        // GET /api/v1/procedures/instances/{id}
         group.MapGet("/{id:guid}", async (
             Guid id,
             Guid tenantId,
+            ITenantContext tenantContext,
+            ICompaniesSessionContext session,
             IProcedureInstanceRepository instanceRepo,
             CancellationToken ct) =>
         {
-            if (tenantId == Guid.Empty)
-                return Results.BadRequest(new { error = "tenantId es requerido." });
+            if (!TramitesTenantScope.TryResolve(
+                    tenantContext, session, tenantId, out var effectiveTenantId, out var tenantError))
+            {
+                return tenantError!;
+            }
 
-            var instance = await instanceRepo.GetByIdAsync(id, tenantId, ct);
+            var instance = await instanceRepo.GetByIdAsync(id, effectiveTenantId, ct);
             return instance is null
                 ? Results.NotFound(new { error = $"Instancia '{id}' no encontrada." })
-                : Results.Ok(instance);
+                : Results.Ok(new
+                {
+                    instance.Id,
+                    compositeId = instance.ReferenceNumber,
+                    instance.TenantId,
+                    instance.ProcedureTypeId,
+                    instance.TrafficAgencyId,
+                    instance.ReferenceNumber,
+                    instance.State,
+                    instance.ConfigSchemaVersion,
+                    instance.RadicatedAt,
+                    instance.CreatedAt,
+                    instance.CreatedBy,
+                });
         })
+        .RequireTramitesPermission(ViewPermission)
         .WithName("GetProcedureInstance")
         .WithSummary("Obtiene una instancia de trámite por ID");
 
-        // POST /api/v1/procedures/instances/{id}/queries/run — MTR-04 #9428
         group.MapPost("/{id:guid}/queries/run", async (
             Guid id,
             RunProcedureQueriesRequest req,
+            ITenantContext tenantContext,
+            ICompaniesSessionContext session,
             IProcedureInstanceRepository instanceRepo,
             IProceduresConfigReadRepository configRepo,
             IDocumentTypesReadRepository documentTypesRepo,
@@ -189,10 +249,16 @@ public static class ProcedureInstancesEndpoints
             ExternalQueryCircuitBreaker circuitBreaker,
             CancellationToken ct) =>
         {
-            if (req.TenantId == Guid.Empty)
-                return Results.BadRequest(new { error = "tenantId es requerido." });
-            if (req.ExecutedByUserId == Guid.Empty)
-                return Results.BadRequest(new { error = "executedByUserId es requerido." });
+            if (!TramitesTenantScope.TryResolve(
+                    tenantContext, session, req.TenantId, out var effectiveTenantId, out var tenantError))
+            {
+                return tenantError!;
+            }
+
+            var executedBy = req.ExecutedByUserId == Guid.Empty
+                ? TramitesTenantScope.ResolveActorUserId(session)
+                : req.ExecutedByUserId;
+
             if (string.IsNullOrWhiteSpace(req.ProcedureTypeCode))
                 return Results.BadRequest(new { error = "procedureTypeCode es requerido." });
             if (string.IsNullOrWhiteSpace(req.EdgeCode))
@@ -203,12 +269,12 @@ public static class ProcedureInstancesEndpoints
             var result = await RunProcedureExternalQueries.HandleAsync(
                 new RunProcedureExternalQueries.Command(
                     id,
-                    req.TenantId,
+                    effectiveTenantId,
                     req.ProcedureTypeCode,
                     req.TrafficAgencyId,
                     req.EdgeCode,
                     req.DocumentTypeCode,
-                    req.ExecutedByUserId,
+                    executedBy,
                     req.CapturedFields,
                     req.OmittedConnectorCodes),
                 instanceRepo,
@@ -221,91 +287,100 @@ public static class ProcedureInstancesEndpoints
                 circuitBreaker,
                 ct);
 
-            return result.Match(
-                ok => Results.Ok(new
-                {
-                    procedureInstanceId = ok.ProcedureInstanceId,
-                    canContinue = ok.CanContinue,
-                    results = ok.Results.Select(r => new
-                    {
-                        connectorCode = r.ConnectorCode,
-                        edgeRole = r.EdgeRole,
-                        status = r.Status,
-                        succeeded = r.Succeeded,
-                        circuitOpen = r.CircuitOpen,
-                        mandatory = r.Mandatory,
-                        integrationCallId = r.IntegrationCallId,
-                        snapshotId = r.SnapshotId,
-                    }),
-                }),
-                err => err.Kind switch
-                {
-                    RunProcedureExternalQueries.RunQueriesErrorKind.InstanceNotFound =>
-                        Results.NotFound(new { error = err.Message }),
-                    RunProcedureExternalQueries.RunQueriesErrorKind.InvalidState =>
-                        Results.Conflict(new { error = err.Message, code = "INVALID_INSTANCE_STATE" }),
-                    _ => Results.BadRequest(new { error = err.Message }),
-                });
+            return MapRunQueriesResult(id, result);
         })
+        .RequireTramitesPermission(ManagePermission)
         .WithName("RunProcedureExternalQueries")
         .WithSummary("Ejecuta consultas externas concurrentes en borrador (MTR-04 #9428)");
 
-        // GET /api/v1/procedures/instances/{id}/query-results — MTR-04 #9428
+        group.MapPost("/{id:guid}/queries/run-async", async (
+            Guid id,
+            RunProcedureQueriesRequest req,
+            ITenantContext tenantContext,
+            ICompaniesSessionContext session,
+            ProcedureQueryBackgroundRunner backgroundRunner,
+            CancellationToken ct) =>
+        {
+            if (!TramitesTenantScope.TryResolve(
+                    tenantContext, session, req.TenantId, out var effectiveTenantId, out var tenantError))
+            {
+                return tenantError!;
+            }
+
+            var executedBy = req.ExecutedByUserId == Guid.Empty
+                ? TramitesTenantScope.ResolveActorUserId(session)
+                : req.ExecutedByUserId;
+
+            if (string.IsNullOrWhiteSpace(req.ProcedureTypeCode))
+                return Results.BadRequest(new { error = "procedureTypeCode es requerido." });
+            if (string.IsNullOrWhiteSpace(req.EdgeCode))
+                return Results.BadRequest(new { error = "edgeCode es requerido." });
+            if (string.IsNullOrWhiteSpace(req.DocumentTypeCode))
+                return Results.BadRequest(new { error = "documentTypeCode es requerido." });
+
+            var jobId = backgroundRunner.EnqueueRunAsync(
+                new RunProcedureExternalQueries.Command(
+                    id,
+                    effectiveTenantId,
+                    req.ProcedureTypeCode,
+                    req.TrafficAgencyId,
+                    req.EdgeCode,
+                    req.DocumentTypeCode,
+                    executedBy,
+                    req.CapturedFields,
+                    req.OmittedConnectorCodes));
+
+            return Results.Accepted(
+                $"/api/v1/procedures/instances/{id}/queries/jobs/{jobId}",
+                new { jobId, status = "pending" });
+        })
+        .RequireTramitesPermission(ManagePermission)
+        .WithName("RunProcedureExternalQueriesAsync")
+        .WithSummary("Encola consultas externas en background (#10080)");
+
         group.MapGet("/{id:guid}/query-results", async (
             Guid id,
             Guid tenantId,
+            ITenantContext tenantContext,
+            ICompaniesSessionContext session,
             IProcedureInstanceRepository instanceRepo,
             IProcedureQueryResultRepository queryResultRepo,
             CancellationToken ct) =>
         {
-            if (tenantId == Guid.Empty)
-                return Results.BadRequest(new { error = "tenantId es requerido." });
+            if (!TramitesTenantScope.TryResolve(
+                    tenantContext, session, tenantId, out var effectiveTenantId, out var tenantError))
+            {
+                return tenantError!;
+            }
 
             var result = await GetProcedureQueryResults.HandleAsync(
-                new GetProcedureQueryResults.Query(id, tenantId),
+                new GetProcedureQueryResults.Query(id, effectiveTenantId),
                 instanceRepo,
                 queryResultRepo,
                 ct);
 
-            return result.Match(
-                ok => Results.Ok(new
-                {
-                    procedureInstanceId = ok.ProcedureInstanceId,
-                    canContinue = ok.CanContinue,
-                    results = ok.Results.Select(r => new
-                    {
-                        connectorCode = r.ConnectorCode,
-                        edgeRole = r.EdgeRole,
-                        status = r.Status,
-                        succeeded = r.Succeeded,
-                        circuitOpen = r.CircuitOpen,
-                        mandatory = r.Mandatory,
-                        integrationCallId = r.IntegrationCallId,
-                        snapshotId = r.SnapshotId,
-                    }),
-                }),
-                err => err.Kind switch
-                {
-                    GetProcedureQueryResults.ErrorKind.InstanceNotFound =>
-                        Results.NotFound(new { error = err.Message }),
-                    _ => Results.BadRequest(new { error = err.Message }),
-                });
+            return MapQueryResultsResult(result);
         })
+        .RequireTramitesPermission(ViewPermission)
         .WithName("GetProcedureQueryResults")
         .WithSummary("Lista snapshots de consultas externas por instancia (MTR-04 #9428)");
 
-        // GET /api/v1/procedures/instances/{id}/allowed-transitions — TRA-01 #9433
         group.MapGet("/{id:guid}/allowed-transitions", async (
             Guid id,
             Guid tenantId,
+            ITenantContext tenantContext,
+            ICompaniesSessionContext session,
             IProcedureInstanceRepository instanceRepo,
             CancellationToken ct) =>
         {
-            if (tenantId == Guid.Empty)
-                return Results.BadRequest(new { error = "tenantId es requerido." });
+            if (!TramitesTenantScope.TryResolve(
+                    tenantContext, session, tenantId, out var effectiveTenantId, out var tenantError))
+            {
+                return tenantError!;
+            }
 
             var result = await TransitionProcedureInstance.GetAllowedTargetsAsync(
-                id, tenantId, instanceRepo, ct);
+                id, effectiveTenantId, instanceRepo, ct);
 
             return result.Match(
                 targets => Results.Ok(new { procedureInstanceId = id, allowedTransitions = targets }),
@@ -316,27 +391,35 @@ public static class ProcedureInstancesEndpoints
                     _ => Results.BadRequest(new { error = err.Message }),
                 });
         })
+        .RequireTramitesPermission(ViewPermission)
         .WithName("GetProcedureAllowedTransitions")
         .WithSummary("Lista estados destino permitidos desde el estado actual (TRA-01)");
 
-        // PATCH /api/v1/procedures/instances/{id}/state — TRA-01 #9433
         group.MapPatch("/{id:guid}/state", async (
             Guid id,
             TransitionProcedureStateRequest req,
+            ITenantContext tenantContext,
+            ICompaniesSessionContext session,
             IProcedureInstanceRepository instanceRepo,
             IProcedureStateHistoryRepository historyRepo,
             IOtRuleRepository otRulesRepo,
             IClock clock,
             CancellationToken ct) =>
         {
-            if (req.TenantId == Guid.Empty)
-                return Results.BadRequest(new { error = "tenantId es requerido." });
-            if (req.ChangedByUserId == Guid.Empty)
-                return Results.BadRequest(new { error = "changedByUserId es requerido." });
+            if (!TramitesTenantScope.TryResolve(
+                    tenantContext, session, req.TenantId, out var effectiveTenantId, out var tenantError))
+            {
+                return tenantError!;
+            }
+
+            var changedBy = req.ChangedByUserId == Guid.Empty
+                ? TramitesTenantScope.ResolveActorUserId(session)
+                : req.ChangedByUserId;
+
             if (string.IsNullOrWhiteSpace(req.ToState))
                 return Results.BadRequest(new { error = "toState es requerido." });
 
-            var instance = await instanceRepo.GetByIdAsync(id, req.TenantId, ct);
+            var instance = await instanceRepo.GetByIdAsync(id, effectiveTenantId, ct);
             if (instance is null)
                 return Results.NotFound(new { error = "Instancia de trámite no encontrada." });
 
@@ -349,7 +432,42 @@ public static class ProcedureInstancesEndpoints
 
             var result = await TransitionProcedureInstance.HandleAsync(
                 new TransitionProcedureInstance.Command(
-                    id, req.TenantId, req.ToState, req.ChangedByUserId, req.Reason),
+                    id, effectiveTenantId, req.ToState, changedBy, req.Reason),
+                instanceRepo,
+                historyRepo,
+                ct);
+
+            return MapTransitionResult(result);
+        })
+        .RequireTramitesPermission(ManagePermission)
+        .WithName("TransitionProcedureInstanceState")
+        .WithSummary("Transiciona el estado de una instancia con guard y historial (TRA-01 #9433)");
+
+        group.MapPatch("/{id:guid}/state/force", async (
+            Guid id,
+            TransitionProcedureStateRequest req,
+            ITenantContext tenantContext,
+            ICompaniesSessionContext session,
+            IProcedureInstanceRepository instanceRepo,
+            IProcedureStateHistoryRepository historyRepo,
+            CancellationToken ct) =>
+        {
+            if (!TramitesTenantScope.TryResolve(
+                    tenantContext, session, req.TenantId, out var effectiveTenantId, out var tenantError))
+            {
+                return tenantError!;
+            }
+
+            var changedBy = req.ChangedByUserId == Guid.Empty
+                ? TramitesTenantScope.ResolveActorUserId(session)
+                : req.ChangedByUserId;
+
+            if (string.IsNullOrWhiteSpace(req.ToState))
+                return Results.BadRequest(new { error = "toState es requerido." });
+
+            var result = await ForceProcedureInstanceState.HandleAsync(
+                new ForceProcedureInstanceState.Command(
+                    id, effectiveTenantId, req.ToState, changedBy, req.Reason),
                 instanceRepo,
                 historyRepo,
                 ct);
@@ -361,36 +479,39 @@ public static class ProcedureInstancesEndpoints
                     fromState = ok.FromState,
                     toState = ok.ToState,
                     historyEntryId = ok.HistoryEntryId,
-                    allowedNextStates = ok.AllowedNextStates,
+                    forced = true,
                 }),
                 err => err.Kind switch
                 {
-                    TransitionProcedureInstance.ErrorKind.NotFound =>
+                    ForceProcedureInstanceState.ErrorKind.NotFound =>
                         Results.NotFound(new { error = err.Message }),
-                    TransitionProcedureInstance.ErrorKind.InvalidTransition =>
-                        Results.Conflict(new { error = err.Message, code = "INVALID_STATE_TRANSITION" }),
                     _ => Results.BadRequest(new { error = err.Message }),
                 });
         })
-        .WithName("TransitionProcedureInstanceState")
-        .WithSummary("Transiciona el estado de una instancia con guard y historial (TRA-01 #9433)");
+        .RequireTramitesPermission(SuperMaestroPermission)
+        .WithName("ForceProcedureInstanceState")
+        .WithSummary("Transición forzada SuperMaestro sin guard (#10079)");
 
-        // GET /api/v1/procedures/instances/{id}/state-history — TRA-01 #9433
         group.MapGet("/{id:guid}/state-history", async (
             Guid id,
             Guid tenantId,
+            ITenantContext tenantContext,
+            ICompaniesSessionContext session,
             IProcedureInstanceRepository instanceRepo,
             IProcedureStateHistoryRepository historyRepo,
             CancellationToken ct) =>
         {
-            if (tenantId == Guid.Empty)
-                return Results.BadRequest(new { error = "tenantId es requerido." });
+            if (!TramitesTenantScope.TryResolve(
+                    tenantContext, session, tenantId, out var effectiveTenantId, out var tenantError))
+            {
+                return tenantError!;
+            }
 
-            var instance = await instanceRepo.GetByIdAsync(id, tenantId, ct);
+            var instance = await instanceRepo.GetByIdAsync(id, effectiveTenantId, ct);
             if (instance is null)
                 return Results.NotFound(new { error = $"Instancia '{id}' no encontrada." });
 
-            var entries = await historyRepo.ListByInstanceAsync(tenantId, id, ct);
+            var entries = await historyRepo.ListByInstanceAsync(effectiveTenantId, id, ct);
             return Results.Ok(new
             {
                 procedureInstanceId = id,
@@ -406,27 +527,119 @@ public static class ProcedureInstancesEndpoints
                 }),
             });
         })
+        .RequireTramitesPermission(ViewPermission)
         .WithName("GetProcedureStateHistory")
         .WithSummary("Historial de transiciones de estado (TRA-01 #9433)");
 
-        // GET /api/v1/procedures/instances/{id}/runtime-capture — TRA-02 #9434
+        group.MapPost("/{id:guid}/owners", async (
+            Guid id,
+            SaveProcedureOwnersRequest req,
+            ITenantContext tenantContext,
+            ICompaniesSessionContext session,
+            IProcedureInstanceRepository instanceRepo,
+            IProcedureActorRepository actorRepo,
+            CancellationToken ct) =>
+        {
+            if (!TramitesTenantScope.TryResolve(
+                    tenantContext, session, req.TenantId, out var effectiveTenantId, out var tenantError))
+            {
+                return tenantError!;
+            }
+
+            var savedBy = req.SavedByUserId == Guid.Empty
+                ? TramitesTenantScope.ResolveActorUserId(session)
+                : req.SavedByUserId;
+
+            var result = await SaveProcedureOwners.HandleAsync(
+                new SaveProcedureOwners.Command(
+                    id,
+                    effectiveTenantId,
+                    savedBy,
+                    req.Owners.Select(o => new SaveProcedureOwners.OwnerInput(
+                        o.DocumentTypeCode,
+                        o.DocumentNumber,
+                        o.FullName,
+                        o.OwnershipPercentage,
+                        o.OwnerSequence)).ToList()),
+                instanceRepo,
+                actorRepo,
+                ct);
+
+            return result.Match(
+                ok => Results.Ok(new { procedureInstanceId = ok.ProcedureInstanceId, ownerCount = ok.OwnerCount }),
+                err => err.Kind switch
+                {
+                    SaveProcedureOwners.ErrorKind.InstanceNotFound =>
+                        Results.NotFound(new { error = err.Message }),
+                    _ => Results.BadRequest(new { error = err.Message }),
+                });
+        })
+        .RequireTramitesPermission(ManagePermission)
+        .WithName("SaveProcedureOwners")
+        .WithSummary("Registra copropietarios con porcentaje (#10081)");
+
+        group.MapGet("/{id:guid}/ownership/validate", async (
+            Guid id,
+            Guid tenantId,
+            ITenantContext tenantContext,
+            ICompaniesSessionContext session,
+            IProcedureInstanceRepository instanceRepo,
+            IProcedureActorRepository actorRepo,
+            CancellationToken ct) =>
+        {
+            if (!TramitesTenantScope.TryResolve(
+                    tenantContext, session, tenantId, out var effectiveTenantId, out var tenantError))
+            {
+                return tenantError!;
+            }
+
+            var result = await ValidateProcedureOwnership.HandleAsync(
+                new ValidateProcedureOwnership.Query(id, effectiveTenantId),
+                instanceRepo,
+                actorRepo,
+                ct);
+
+            return result.Match(
+                ok => Results.Ok(new
+                {
+                    isValid = ok.IsValid,
+                    totalPercentage = ok.TotalPercentage,
+                    owners = ok.Owners,
+                    errors = ok.Errors,
+                }),
+                err => err.Kind switch
+                {
+                    ValidateProcedureOwnership.ErrorKind.InstanceNotFound =>
+                        Results.NotFound(new { error = err.Message }),
+                    _ => Results.BadRequest(new { error = err.Message }),
+                });
+        })
+        .RequireTramitesPermission(ViewPermission)
+        .WithName("ValidateProcedureOwnership")
+        .WithSummary("Valida suma 100% de copropiedad (#10081)");
+
         group.MapGet("/{id:guid}/runtime-capture", async (
             Guid id,
             Guid tenantId,
+            ITenantContext tenantContext,
+            ICompaniesSessionContext session,
             IProcedureInstanceRepository instanceRepo,
             IProcedureActorRepository actorRepo,
             IProcedureVehicleRepository vehicleRepo,
             CancellationToken ct) =>
         {
-            if (tenantId == Guid.Empty)
-                return Results.BadRequest(new { error = "tenantId es requerido." });
+            if (!TramitesTenantScope.TryResolve(
+                    tenantContext, session, tenantId, out var effectiveTenantId, out var tenantError))
+            {
+                return tenantError!;
+            }
 
-            var instance = await instanceRepo.GetByIdAsync(id, tenantId, ct);
+            var instance = await instanceRepo.GetByIdAsync(id, effectiveTenantId, ct);
             if (instance is null)
                 return Results.NotFound(new { error = $"Instancia '{id}' no encontrada." });
 
-            var actors = await actorRepo.ListByInstanceAsync(tenantId, id, ct);
-            var vehicle = await vehicleRepo.GetByInstanceAsync(tenantId, id, ct);
+            var actors = await actorRepo.ListByInstanceAsync(effectiveTenantId, id, ct);
+            var vehicle = await vehicleRepo.GetByInstanceAsync(effectiveTenantId, id, ct);
 
             return Results.Ok(new
             {
@@ -440,6 +653,8 @@ public static class ProcedureInstancesEndpoints
                     a.DocumentTypeCode,
                     a.DocumentNumber,
                     a.FullName,
+                    a.OwnershipPercentage,
+                    a.OwnerSequence,
                 }),
                 vehicle = vehicle is null
                     ? null
@@ -452,9 +667,85 @@ public static class ProcedureInstancesEndpoints
                     },
             });
         })
+        .RequireTramitesPermission(ViewPermission)
         .WithName("GetProcedureRuntimeCapture")
         .WithSummary("Actores y vehículo capturados al radicar (TRA-02 #9434)");
     }
+
+    private static IResult MapRunQueriesResult(
+        Guid id,
+        Result<RunProcedureExternalQueries.Response, RunProcedureExternalQueries.RunQueriesError> result) =>
+        result.Match(
+            ok => Results.Ok(new
+            {
+                procedureInstanceId = ok.ProcedureInstanceId,
+                canContinue = ok.CanContinue,
+                results = ok.Results.Select(r => new
+                {
+                    connectorCode = r.ConnectorCode,
+                    edgeRole = r.EdgeRole,
+                    status = r.Status,
+                    succeeded = r.Succeeded,
+                    circuitOpen = r.CircuitOpen,
+                    mandatory = r.Mandatory,
+                    integrationCallId = r.IntegrationCallId,
+                    snapshotId = r.SnapshotId,
+                }),
+            }),
+            err => err.Kind switch
+            {
+                RunProcedureExternalQueries.RunQueriesErrorKind.InstanceNotFound =>
+                    Results.NotFound(new { error = err.Message }),
+                RunProcedureExternalQueries.RunQueriesErrorKind.InvalidState =>
+                    Results.Conflict(new { error = err.Message, code = "INVALID_INSTANCE_STATE" }),
+                _ => Results.BadRequest(new { error = err.Message }),
+            });
+
+    private static IResult MapQueryResultsResult(
+        Result<GetProcedureQueryResults.Response, GetProcedureQueryResults.QueryError> result) =>
+        result.Match(
+            ok => Results.Ok(new
+            {
+                procedureInstanceId = ok.ProcedureInstanceId,
+                canContinue = ok.CanContinue,
+                results = ok.Results.Select(r => new
+                {
+                    connectorCode = r.ConnectorCode,
+                    edgeRole = r.EdgeRole,
+                    status = r.Status,
+                    succeeded = r.Succeeded,
+                    circuitOpen = r.CircuitOpen,
+                    mandatory = r.Mandatory,
+                    integrationCallId = r.IntegrationCallId,
+                    snapshotId = r.SnapshotId,
+                }),
+            }),
+            err => err.Kind switch
+            {
+                GetProcedureQueryResults.ErrorKind.InstanceNotFound =>
+                    Results.NotFound(new { error = err.Message }),
+                _ => Results.BadRequest(new { error = err.Message }),
+            });
+
+    private static IResult MapTransitionResult(
+        Result<TransitionProcedureInstance.Response, TransitionProcedureInstance.TransitionError> result) =>
+        result.Match(
+            ok => Results.Ok(new
+            {
+                procedureInstanceId = ok.ProcedureInstanceId,
+                fromState = ok.FromState,
+                toState = ok.ToState,
+                historyEntryId = ok.HistoryEntryId,
+                allowedNextStates = ok.AllowedNextStates,
+            }),
+            err => err.Kind switch
+            {
+                TransitionProcedureInstance.ErrorKind.NotFound =>
+                    Results.NotFound(new { error = err.Message }),
+                TransitionProcedureInstance.ErrorKind.InvalidTransition =>
+                    Results.Conflict(new { error = err.Message, code = "INVALID_STATE_TRANSITION" }),
+                _ => Results.BadRequest(new { error = err.Message }),
+            });
 
     private static IResult MapFilingError(
         Flit.Modules.ProceduresConfig.Domain.ProcedureActorError error) =>
@@ -483,6 +774,18 @@ public static class ProcedureInstancesEndpoints
         string ToState,
         string? Reason);
 
+    public sealed record SaveProcedureOwnersRequest(
+        Guid TenantId,
+        Guid SavedByUserId,
+        List<OwnerInputDto> Owners);
+
+    public sealed record OwnerInputDto(
+        string DocumentTypeCode,
+        string DocumentNumber,
+        string? FullName,
+        decimal? OwnershipPercentage,
+        short OwnerSequence);
+
     public sealed record CreateProcedureInstanceRequest(
         Guid TenantId,
         Guid FiledByUserId,
@@ -493,16 +796,6 @@ public static class ProcedureInstancesEndpoints
         Dictionary<string, string?>? FieldValues = null,
         string? DocumentTypeCode = null);
 
-    public sealed record ProcedureInstanceListItem(
-        Guid Id,
-        string ReferenceNumber,
-        string State,
-        Guid ProcedureTypeId,
-        Guid? TrafficAgencyId,
-        DateTimeOffset? RadicatedAt,
-        DateTimeOffset CreatedAt,
-        Guid CreatedBy);
-
     public sealed record ProcedureInstanceResponse(
         Guid Id,
         Guid TenantId,
@@ -510,6 +803,7 @@ public static class ProcedureInstancesEndpoints
         string ProcedureTypeCode,
         Guid? TrafficAgencyId,
         string ReferenceNumber,
+        string CompositeId,
         string State,
         int ConfigSchemaVersion,
         DateTimeOffset CreatedAt,

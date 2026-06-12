@@ -9,8 +9,9 @@ public sealed class InMemoryProcedureActorRepository : IProcedureActorRepository
     public Task UpsertAsync(ProcedureActorEntry entry, CancellationToken ct = default)
     {
         var idx = _store.FindIndex(a =>
-            a.ProcedureInstanceId == entry.ProcedureInstanceId &&
-            string.Equals(a.EdgeRole, entry.EdgeRole, StringComparison.OrdinalIgnoreCase));
+            a.ProcedureInstanceId == entry.ProcedureInstanceId
+            && string.Equals(a.EdgeRole, entry.EdgeRole, StringComparison.OrdinalIgnoreCase)
+            && a.OwnerSequence == entry.OwnerSequence);
 
         if (idx >= 0)
         {
@@ -24,16 +25,51 @@ public sealed class InMemoryProcedureActorRepository : IProcedureActorRepository
         return Task.CompletedTask;
     }
 
+    public Task ReplaceOwnersAsync(
+        Guid tenantId,
+        Guid procedureInstanceId,
+        string edgeRole,
+        IReadOnlyList<ProcedureActorEntry> owners,
+        CancellationToken ct = default)
+    {
+        _store.RemoveAll(a =>
+            a.TenantId == tenantId
+            && a.ProcedureInstanceId == procedureInstanceId
+            && string.Equals(a.EdgeRole, edgeRole, StringComparison.OrdinalIgnoreCase));
+
+        _store.AddRange(owners);
+        return Task.CompletedTask;
+    }
+
     public Task<ProcedureActorEntry?> GetByInstanceAndEdgeAsync(
         Guid tenantId,
         Guid procedureInstanceId,
         string edgeRole,
         CancellationToken ct = default)
     {
-        var result = _store.FirstOrDefault(a =>
-            a.TenantId == tenantId &&
-            a.ProcedureInstanceId == procedureInstanceId &&
-            string.Equals(a.EdgeRole, edgeRole, StringComparison.OrdinalIgnoreCase));
+        var result = _store
+            .Where(a =>
+                a.TenantId == tenantId
+                && a.ProcedureInstanceId == procedureInstanceId
+                && string.Equals(a.EdgeRole, edgeRole, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(a => a.OwnerSequence)
+            .FirstOrDefault();
+        return Task.FromResult(result);
+    }
+
+    public Task<IReadOnlyList<ProcedureActorEntry>> ListByInstanceAndEdgeAsync(
+        Guid tenantId,
+        Guid procedureInstanceId,
+        string edgeRole,
+        CancellationToken ct = default)
+    {
+        IReadOnlyList<ProcedureActorEntry> result = _store
+            .Where(a =>
+                a.TenantId == tenantId
+                && a.ProcedureInstanceId == procedureInstanceId
+                && string.Equals(a.EdgeRole, edgeRole, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(a => a.OwnerSequence)
+            .ToList();
         return Task.FromResult(result);
     }
 

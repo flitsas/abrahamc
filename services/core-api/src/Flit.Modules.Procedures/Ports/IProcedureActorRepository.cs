@@ -9,6 +9,8 @@ public sealed record ProcedureActorEntry(
     string DocumentTypeCode,
     string DocumentNumber,
     string? FullName,
+    decimal? OwnershipPercentage,
+    short OwnerSequence,
     Guid CreatedBy,
     Guid UpdatedBy);
 
@@ -16,7 +18,20 @@ public interface IProcedureActorRepository
 {
     Task UpsertAsync(ProcedureActorEntry entry, CancellationToken ct = default);
 
+    Task ReplaceOwnersAsync(
+        Guid tenantId,
+        Guid procedureInstanceId,
+        string edgeRole,
+        IReadOnlyList<ProcedureActorEntry> owners,
+        CancellationToken ct = default);
+
     Task<ProcedureActorEntry?> GetByInstanceAndEdgeAsync(
+        Guid tenantId,
+        Guid procedureInstanceId,
+        string edgeRole,
+        CancellationToken ct = default);
+
+    Task<IReadOnlyList<ProcedureActorEntry>> ListByInstanceAndEdgeAsync(
         Guid tenantId,
         Guid procedureInstanceId,
         string edgeRole,

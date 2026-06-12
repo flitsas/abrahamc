@@ -126,6 +126,8 @@ public static class SaveProcedureRuntimeCapture
                 docTypeCode,
                 docNumber.Trim(),
                 fullName,
+                OwnershipPercentage: null,
+                OwnerSequence: 0,
                 command.UserId,
                 command.UserId),
             ct);
