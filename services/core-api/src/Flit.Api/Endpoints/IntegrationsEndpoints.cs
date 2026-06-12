@@ -1,7 +1,9 @@
 using System.Text.Json;
+using Flit.Api.Auth;
 using Flit.Infrastructure.Persistence;
 using Flit.Modules.Companies.Application;
 using Flit.Modules.Companies.Ports;
+using Flit.Modules.Identity.Ports;
 using Flit.Modules.Integrations.Application;
 using Flit.Modules.Integrations.Ports;
 using Flit.Modules.Procedures.Domain;
@@ -90,19 +92,22 @@ public static class IntegrationsEndpoints
         group.MapGet("/logs", async (
             Guid trafficAgencyId,
             IIntegrationLogRepository logRepo,
+            ITokenIssuer tokenIssuer,
+            ICompaniesSessionContext session,
             HttpContext ctx,
             int page = 1,
             int pageSize = 20,
             CancellationToken ct = default) =>
         {
-            if (!ctx.Request.Headers.TryGetValue("X-Flit-Tenant-Id", out var tenantHeader)
-                || !Guid.TryParse(tenantHeader, out var tenantId))
-            {
-                return Results.BadRequest(new { error = "X-Flit-Tenant-Id requerido." });
-            }
+            if (!OtEndpointAuth.CanRead(ctx, tokenIssuer, session))
+                return Results.Json(new { error = "Forbidden" }, statusCode: StatusCodes.Status403Forbidden);
+
+            var tenantId = session.TenantId;
+            if (tenantId is null)
+                return Results.BadRequest(new { error = "Tenant no resuelto en la sesión." });
 
             var (items, total) = await logRepo.ListByAgencyAsync(
-                tenantId, trafficAgencyId, page, pageSize, ct);
+                tenantId.Value, trafficAgencyId, page, pageSize, ct);
 
             return Results.Ok(new
             {
@@ -112,14 +117,12 @@ public static class IntegrationsEndpoints
                 items = items.Select(i => new
                 {
                     id = i.Id,
-                    provider = i.Provider,
                     direction = i.Direction,
-                    event_type = i.EventType,
-                    payload = i.PayloadJson,
-                    http_status = i.HttpStatus,
-                    result = i.Result,
-                    latency_ms = i.LatencyMs,
-                    called_at = i.CalledAt,
+                    eventType = i.EventType ?? "",
+                    status = i.Result,
+                    receivedAt = i.CalledAt,
+                    processedAt = (DateTimeOffset?)null,
+                    idempotencyKey = (string?)null,
                 }),
             });
         })

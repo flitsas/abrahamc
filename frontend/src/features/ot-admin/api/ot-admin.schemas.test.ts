@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  integrationLogsPageSchema,
   otConsolidatedOrderSchema,
   otDashboardSchema,
   otIntegrationModeSchema,
@@ -52,5 +53,27 @@ describe("ot-admin.schemas", () => {
 
   it("accepts quipux integration mode", () => {
     expect(otIntegrationModeSchema.parse("quipux")).toBe("quipux");
+  });
+
+  it("parses integration logs page from consola OT API", () => {
+    const parsed = integrationLogsPageSchema.parse({
+      total: 1,
+      page: 1,
+      pageSize: 10,
+      items: [
+        {
+          id: "01930101-0001-7001-8001-000000000006",
+          direction: "inbound",
+          eventType: "procedure.approved",
+          status: "ok",
+          receivedAt: "2026-06-12T10:00:00Z",
+          processedAt: null,
+          idempotencyKey: null,
+        },
+      ],
+    });
+
+    expect(parsed.items[0].eventType).toBe("procedure.approved");
+    expect(parsed.items[0].status).toBe("ok");
   });
 });
