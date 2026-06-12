@@ -5,9 +5,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-if [ -f "$ROOT/scripts/validate-pre-push.sh" ]; then
-  bash "$ROOT/scripts/validate-pre-push.sh"
-else
-  echo "ERROR: scripts/validate-pre-push.sh no encontrado" >&2
-  exit 1
-fi
+case "$(uname -s 2>/dev/null)" in
+  MINGW*|MSYS*|CYGWIN*)
+    # Git Bash en Windows: usar script PowerShell (gitleaks/Docker paths correctos)
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$ROOT/scripts/validate-pre-push.ps1"
+    ;;
+  *)
+    bash "$ROOT/scripts/validate-pre-push.sh"
+    ;;
+esac
