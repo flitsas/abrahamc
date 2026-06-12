@@ -4,13 +4,15 @@ using Flit.Modules.Companies.Application;
 using Flit.Modules.Companies.Ports;
 using Flit.Modules.Integrations.Application;
 using Flit.Modules.Integrations.Ports;
+using Flit.Modules.Procedures.Domain;
+using Flit.Modules.Procedures.Ports;
 using Flit.SharedKernel;
 
 namespace Flit.Api.Endpoints;
 
 /// <summary>
 /// INT-01 #9431 — consultas externas (mock DEV).
-/// INT-02 #9459 — webhooks QX inbound con idempotencia.
+/// INT-02 #9459 / HU #9698 — webhooks QX inbound con idempotencia y logs.
 /// </summary>
 public static class IntegrationsEndpoints
 {
@@ -77,51 +79,125 @@ public static class IntegrationsEndpoints
         .WithName("ExecuteExternalQuery")
         .WithSummary("Ejecuta consulta externa con bitácora e idempotencia (INT-01)");
 
-        group.MapPost("/webhooks/qx", async (
-            QxWebhookRequest req,
-            IWebhookEventRepository repo,
-            FlitDbContext db,
-            IClock clock,
+        group.MapPost("/webhooks/qx", HandleQxWebhook)
+        .WithName("ReceiveQxWebhook")
+        .WithSummary("Recibe un webhook QX inbound con idempotencia (INT-02)");
+
+        group.MapPost("/quipux/webhook", HandleQxWebhook)
+        .WithName("ReceiveQuipuxWebhook")
+        .WithSummary("Alias Quipux mock webhook (HU #9698)");
+
+        group.MapGet("/logs", async (
+            Guid trafficAgencyId,
+            IIntegrationLogRepository logRepo,
             HttpContext ctx,
-            CancellationToken ct) =>
+            int page = 1,
+            int pageSize = 20,
+            CancellationToken ct = default) =>
         {
-            if (string.IsNullOrWhiteSpace(req.EventType))
-                return Results.BadRequest(new { error = "event_type es requerido." });
-
-            if (string.IsNullOrWhiteSpace(req.IdempotencyKey))
-                return Results.BadRequest(new { error = "idempotency_key es requerido." });
-
             if (!ctx.Request.Headers.TryGetValue("X-Flit-Tenant-Id", out var tenantHeader)
                 || !Guid.TryParse(tenantHeader, out var tenantId))
             {
                 return Results.BadRequest(new { error = "X-Flit-Tenant-Id requerido." });
             }
 
-            var cmd = new ReceiveQxWebhook.Command(
-                TenantId: tenantId,
-                TrafficAgencyId: req.TrafficAgencyId,
-                EventType: req.EventType,
-                PayloadJson: req.PayloadJson,
-                IdempotencyKey: req.IdempotencyKey,
-                Signature: req.Signature);
-
-            var result = await ReceiveQxWebhook.HandleAsync(
-                cmd,
-                repo,
-                async cancellationToken => await db.SaveChangesAsync(cancellationToken),
-                clock,
-                ct);
+            var (items, total) = await logRepo.ListByAgencyAsync(
+                tenantId, trafficAgencyId, page, pageSize, ct);
 
             return Results.Ok(new
             {
-                event_id = result.EventId == Guid.Empty ? (Guid?)null : result.EventId,
-                direction = result.Direction,
-                payload = result.PayloadJson,
-                processed_at = result.ProcessedAt,
-                idempotent = result.WasIdempotent,
+                total,
+                page,
+                pageSize,
+                items = items.Select(i => new
+                {
+                    id = i.Id,
+                    provider = i.Provider,
+                    direction = i.Direction,
+                    event_type = i.EventType,
+                    payload = i.PayloadJson,
+                    http_status = i.HttpStatus,
+                    result = i.Result,
+                    latency_ms = i.LatencyMs,
+                    called_at = i.CalledAt,
+                }),
             });
         })
-        .WithName("ReceiveQxWebhook")
-        .WithSummary("Recibe un webhook QX inbound con idempotencia (INT-02)");
+        .WithName("ListIntegrationLogs")
+        .WithSummary("Lista logs de integración por OT (HU #9698)");
+    }
+
+    private static async Task<IResult> HandleQxWebhook(
+        QxWebhookRequest req,
+        IQuipuxWebhookAdapter adapter,
+        IWebhookEventRepository webhookRepo,
+        IIntegrationLogRepository logRepo,
+        IProcedureInstanceRepository procedureRepo,
+        IProcedureStateHistoryRepository historyRepo,
+        FlitDbContext db,
+        IClock clock,
+        HttpContext ctx,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(req.EventType))
+            return Results.BadRequest(new { error = "event_type es requerido." });
+
+        if (string.IsNullOrWhiteSpace(req.IdempotencyKey))
+            return Results.BadRequest(new { error = "idempotency_key es requerido." });
+
+        if (!ctx.Request.Headers.TryGetValue("X-Flit-Tenant-Id", out var tenantHeader)
+            || !Guid.TryParse(tenantHeader, out var tenantId))
+        {
+            return Results.BadRequest(new { error = "X-Flit-Tenant-Id requerido." });
+        }
+
+        var signature = req.Signature;
+        if (string.IsNullOrWhiteSpace(signature) &&
+            ctx.Request.Headers.TryGetValue("X-Quipux-Signature", out var headerSig))
+        {
+            signature = headerSig.ToString();
+        }
+
+        var cmd = new ReceiveQxWebhook.Command(
+            TenantId: tenantId,
+            TrafficAgencyId: req.TrafficAgencyId,
+            EventType: req.EventType,
+            PayloadJson: req.PayloadJson,
+            IdempotencyKey: req.IdempotencyKey,
+            Signature: signature);
+
+        var result = await ReceiveQxWebhook.HandleAsync(
+            cmd,
+            adapter,
+            webhookRepo,
+            logRepo,
+            procedureRepo,
+            historyRepo,
+            async cancellationToken => await db.SaveChangesAsync(cancellationToken),
+            clock,
+            ct);
+
+        if (!result.IsSuccess)
+        {
+            return result.Error.Code switch
+            {
+                ReceiveQxWebhook.ErrorCode.InvalidSignature =>
+                    Results.Json(new { error = result.Error.Message }, statusCode: StatusCodes.Status401Unauthorized),
+                _ => Results.BadRequest(new { error = result.Error.Message }),
+            };
+        }
+
+        var r = result.Value;
+        return Results.Ok(new
+        {
+            event_id = r.EventId,
+            direction = r.Direction,
+            payload = r.PayloadJson,
+            processed_at = r.ProcessedAt,
+            idempotent = r.WasIdempotent,
+            procedure_updated = r.ProcedureUpdated,
+            procedure_id = r.ProcedureId,
+            new_state = r.NewState,
+        });
     }
 }
