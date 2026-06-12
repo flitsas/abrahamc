@@ -461,6 +461,7 @@ if (usePostgres)
     app.MapOtEndpoints();
     app.MapOtRulesEndpoints();
     app.MapOtConsolidatedOrderEndpoints();
+    app.MapOtDocumentLabelsEndpoints();
 }
 app.MapProceduresConfigEndpoints();
 app.MapProceduresConfigAdminEndpoints();

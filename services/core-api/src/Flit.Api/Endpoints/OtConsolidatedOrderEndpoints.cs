@@ -155,13 +155,25 @@ internal static class OtEndpointAuth
 {
     private const string OtOperatorPermission = "modulo.ot.operador";
     private const string OtSuperAdminPermission = "modulo.ot.superadmin";
+    private const string OtAdministerPermission = "modulo.ot.administrar";
+    private const string OtManageRulesPermission = "modulo.ot.gestionar-reglas";
+    private const string OtReorderDocumentsPermission = "ui.ot.reordenar-documentos";
 
     public static bool CanRead(HttpContext ctx, ITokenIssuer tokenIssuer, ICompaniesSessionContext session) =>
         HasPermission(ctx, tokenIssuer, session, OtOperatorPermission)
         || HasPermission(ctx, tokenIssuer, session, OtSuperAdminPermission);
 
+    public static bool CanAdminister(HttpContext ctx, ITokenIssuer tokenIssuer, ICompaniesSessionContext session) =>
+        HasPermission(ctx, tokenIssuer, session, OtAdministerPermission)
+        || HasPermission(ctx, tokenIssuer, session, OtSuperAdminPermission);
+
+    public static bool CanManageRules(HttpContext ctx, ITokenIssuer tokenIssuer, ICompaniesSessionContext session) =>
+        HasPermission(ctx, tokenIssuer, session, OtManageRulesPermission)
+        || HasPermission(ctx, tokenIssuer, session, OtSuperAdminPermission);
+
     public static bool CanMutate(HttpContext ctx, ITokenIssuer tokenIssuer, ICompaniesSessionContext session) =>
-        HasPermission(ctx, tokenIssuer, session, OtSuperAdminPermission);
+        HasPermission(ctx, tokenIssuer, session, OtReorderDocumentsPermission)
+        || HasPermission(ctx, tokenIssuer, session, OtSuperAdminPermission);
 
     private static bool HasPermission(
         HttpContext ctx,
