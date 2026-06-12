@@ -193,7 +193,9 @@ export function AppLayout({ previewPath }: AppLayoutProps) {
         <Route
           path="/admin/parametrizacion"
           element={
-            <RequirePermissionRoute permission={PERMISSIONS.viewParametrizacion}>
+            <RequirePermissionRoute
+              permission={PERMISSIONS.viewParametrizacion}
+            >
               <ParametrizacionAdminPage />
             </RequirePermissionRoute>
           }

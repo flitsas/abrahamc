@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Bloquea push si falla la puerta local (mismo alcance que .cursor/rules/pre-push-gate.mdc).
+# Bloquea push si falla validate-pre-push (Prettier + lint + typecheck + tests + build + backend + EF + gitleaks).
+# Ver .cursor/rules/pre-push-gate.mdc — activar con: pnpm run hooks:install
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"

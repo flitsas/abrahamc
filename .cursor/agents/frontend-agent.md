@@ -117,7 +117,7 @@ Si faltan campos, haz **UNA sola pregunta consolidada**.
    - **Validación:** en ADO debe verse como otras HUs del equipo (bloques AC + tablas). Si no, no continúes.
    - **Mensaje final al usuario:** solo después de PASO 7 (o bloqueo documentado con HTML PASO 6 en chat si falta PAT).
 7. **Git (con confirmación del usuario):**
-   - **Antes** de commit/push: ejecutar puerta `.cursor/rules/pre-push-gate.mdc` (`pnpm run validate:pre-push:win` + lint/typecheck/build FE si aplica) y mostrar plantilla PASS/FAIL al usuario.
+   - **Antes** de commit/push: ejecutar **solo** `pnpm run validate:pre-push:win` (incluye `format:check`, lint, typecheck, tests y build FE + backend + gitleaks). **Exit code 0 obligatorio** — mostrar plantilla PASS/FAIL de `.cursor/rules/pre-push-gate.mdc`. Prohibido push si falla Prettier u otro paso.
    - Propón rama (`feature/AB-<ID>-<slug>` o `agent/frontend/<ID>-<slug>`), mensaje de commit (`HU<ID>: …`) y resumen para el cuerpo del PR.
    - **No ejecutes** `git checkout -b`, `git commit` ni `git push` hasta PASS en la puerta **y** aprobación explícita (sí / no).
    - Tras push aprobado, **no abras PR** — pasa al paso 8.

@@ -1,5 +1,5 @@
 ---
-description: Puerta obligatoria antes de commit/push a ramas compartidas — tests, gitleaks y validación local
+description: Puerta obligatoria antes de commit/push a ramas compartidas — paridad total con CI local
 alwaysApply: true
 ---
 
@@ -10,69 +10,87 @@ alwaysApply: true
 Si el usuario dice **commit**, **push**, **commit y push**, **procede con commit**, **sube a develop** o similar:
 
 1. **DETENER** — no ejecutar `git add`, `git commit` ni `git push` todavía.
-2. **EJECUTAR** `pnpm run validate:pre-push:win` (Windows) o `pnpm run validate:pre-push` (Linux/macOS).
-3. **MOSTRAR** la plantilla PASS/FAIL al usuario (sección final de esta regla).
-4. Solo si **todos** los pasos aplicables son PASS → proceder con commit/push.
+2. **EJECUTAR UN SOLO COMANDO** (incluye **todo** lo que exige CI):
+   - Windows: `pnpm run validate:pre-push:win`
+   - Linux/macOS: `pnpm run validate:pre-push`
+3. **VERIFICAR exit code 0** — si falla cualquier paso, **no** continuar.
+4. **MOSTRAR** la plantilla PASS/FAIL al usuario (sección final).
+5. Solo si **exit code 0** → proceder con commit/push.
 
-**Prohibido:** saltar directo a `git status` + `git commit` + `git push` aunque el usuario haya dicho "sí, procede".
+**Prohibido:**
 
-**Cuándo aplica:** siempre que el usuario pida **commit**, **push** o **commit y push** a `develop`, `staging`, `release` o `main` — con o sin PR previo.
+- Saltar directo a `git status` + `git commit` + `git push`.
+- Ejecutar solo parte del checklist (p. ej. backend sin `format:check`).
+- Asumir que `validate:pre-push` antiguo bastaba — **debe** incluir Prettier, lint, typecheck, tests y build frontend.
+- Ejecutar `git push` sin haber pasado esta puerta en la **misma sesión**, salvo autorización explícita del usuario documentando el riesgo.
 
-**Prohibido:** ejecutar `git push` sin haber pasado esta puerta en la **misma sesión**, salvo que el usuario autorice explícitamente saltarla documentando el riesgo.
+**Cuándo aplica:** siempre que el usuario pida **commit**, **push** o **commit y push** a `develop`, `staging`, `release` o `main`.
 
 ---
 
-## Por qué existe
+## Qué ejecuta `validate:pre-push` (paridad CI)
 
-El flujo estándar FLIT valida CI **al mergear el PR** (`flit-integration-ado`, pre-condiciones #5–#6). Un **push directo a `develop`** dispara CD y Security Scan **sin PR**; si no validamos antes, el remoto falla tarde (como gitleaks en push).
+El script `scripts/validate-pre-push.ps1` / `.sh` corre **en orden** y **sin omitir**:
+
+| Paso | Validación | Equivalente CI |
+|------|------------|----------------|
+| 1 | `pnpm -r format:check` | `.github/workflows/ci.yml` — Format check |
+| 2 | `pnpm -r lint` | CI — Lint |
+| 3 | `pnpm -r typecheck` | CI — Type check |
+| 4 | `pnpm --filter @flit/frontend test` | Vitest local |
+| 5 | `pnpm --filter @flit/frontend build` | CI — Build |
+| 6 | `dotnet test` (Flit.Api.Tests) | Core API workflow |
+| 7 | `dotnet build` Release | Core API workflow |
+| 8 | EF migrations (`.Designer.cs` + `migrations list`) | Integridad migraciones |
+| 9 | Gitleaks (archivos en git) | Security Scan |
+
+**No hay pasos opcionales por diff** en push a rama compartida: ejecutar el script completo.
 
 ---
 
-## Checklist obligatorio (en orden)
+## Bloqueo mecánico (git hook)
 
-Ejecutar **todos** los pasos aplicables al diff. Mostrar al usuario un resumen PASS/FAIL **antes** de `git commit` / `git push`.
+Además de la regla del agente, activar el hook local **una vez**:
 
-| # | Validación | Comando | Cuándo omitir |
-|---|------------|---------|---------------|
-| 0 | **Atajo (ejecutar primero)** | `pnpm run validate:pre-push:win` o `validate:pre-push` | Nunca en push a rama compartida |
-| 1 | Tests backend | incluido en atajo | Solo si el diff no toca `services/core-api/` |
-| 2 | Build backend Release | `dotnet build services/core-api/Flit.slnx -c Release` | Solo si el diff no toca `services/core-api/` |
-| 3 | Tests frontend | `pnpm --filter @flit/frontend test` | Solo si el diff no toca `frontend/` |
-| 4 | Lint + format + typecheck + build FE | `pnpm -r format:check && pnpm -r lint && pnpm -r typecheck && pnpm -r build` | Solo si el diff no toca `frontend/` o `packages/` |
-| 5 | Migraciones EF (`.Designer.cs` + `migrations list`) | incluido en atajo | Solo si el diff no toca `**/Migrations/**` |
-| 6 | Gitleaks (mismo alcance que CI: solo archivos en git) | incluido en atajo | Nunca en push a rama compartida |
-
-**Nota Windows:** si `dotnet ef migrations list` falla por DLL bloqueada (`Flit.Api` en ejecución), detener `pnpm dev` / `dotnet watch` y re-ejecutar el atajo.
-
-**Gitleaks no instalado localmente:** descargar v8.21.2 (misma versión que `.github/workflows/security-scan.yml`) o usar Docker:
-
-```bash
-docker run --rm -v "${PWD}:/repo" ghcr.io/gitleaks/gitleaks:v8.21.2 detect --source /repo --config /repo/.gitleaks.toml --no-git --redact --exit-code 1
+```powershell
+git config core.hooksPath .githooks
 ```
 
-**Tokens en tests:** usar prefijo `flit_test` o rutas bajo `services/core-api/tests/` (ver `.gitleaks.toml`).
+O ejecutar: `pnpm run hooks:install` (ver `scripts/install-git-hooks.ps1`).
+
+Con `core.hooksPath` activo, **`git push` falla automáticamente** si el script no pasa — el agente no puede saltarlo por error.
+
+---
+
+## Por qué existía el hueco
+
+El script `validate-pre-push` original solo cubría backend + EF + gitleaks. CI además exige **Prettier** (`format:check`). El agente ejecutó el atajo incompleto y el push rompió CI en GitHub aunque CD desplegó.
 
 ---
 
 ## Si algún paso falla
 
 1. **No** hacer commit ni push.
-2. Corregir el problema.
-3. Re-ejecutar el checklist completo.
+2. Corregir (p. ej. `pnpm --filter @flit/frontend format` si falla Prettier).
+3. Re-ejecutar `pnpm run validate:pre-push:win` **completo**.
 4. Informar al usuario qué falló y qué se corrigió.
+
+**Prettier:** `pnpm --filter @flit/frontend format`
+
+**DLL bloqueada (Windows):** detener `pnpm dev` / `dotnet watch` y re-ejecutar.
+
+**Gitleaks:** v8.21.2 o Docker `ghcr.io/gitleaks/gitleaks:v8.21.2` (ver `.gitleaks.toml`).
 
 ---
 
 ## Relación con otros artefactos FLIT
 
-| Artefacto | Qué cubre | Qué **no** cubre |
-|-----------|-----------|------------------|
-| `@dev-tester` | Evidencias ADO + tests por AC | Push directo sin HU |
-| `flit-integration-ado` pre-condiciones #5–#6 | CI verde **antes de merge PR** | Push sin PR |
-| `security-agent` | SAST/SCA/gitleaks en auditoría de PR | Validación local pre-push |
-| `agent-templates/security-checklist.md` | Patrones inline pre-PR | Comandos ejecutables |
-| **Esta regla** | Puerta local **antes de push** | Deploy VPS (infra-agent) |
-| `.cursor/rules/ef-migrations.mdc` | Integridad `.cs` + `.Designer.cs` | DDL/SQL en sí (database-agent) |
+| Artefacto | Qué cubre |
+|-----------|-----------|
+| **Esta regla + `validate-pre-push`** | Puerta local **completa** antes de push |
+| `flit-integration-ado` #5–#6 | CI verde antes de **merge PR** |
+| `security-agent` | Auditoría profunda en PR |
+| `.cursor/rules/ef-migrations.mdc` | Detalle migraciones EF |
 
 ---
 
@@ -81,11 +99,18 @@ docker run --rm -v "${PWD}:/repo" ghcr.io/gitleaks/gitleaks:v8.21.2 detect --sou
 Antes del push, mostrar:
 
 ```
-✅ Pre-push gate (obligatorio antes de commit/push)
-  - validate:pre-push: PASS/FAIL
-  - dotnet build Release (si backend): PASS/FAIL/SKIP
-  - frontend lint/format/typecheck/build (si frontend): PASS/FAIL/SKIP
-  - frontend tests (si frontend): PASS/FAIL/SKIP
+✅ Pre-push gate (obligatorio — un solo comando)
+  Comando: pnpm run validate:pre-push:win
+  - format:check (Prettier): PASS/FAIL
+  - lint: PASS/FAIL
+  - typecheck: PASS/FAIL
+  - frontend test: PASS/FAIL
+  - frontend build: PASS/FAIL
+  - dotnet test: PASS/FAIL
+  - dotnet build Release: PASS/FAIL
+  - EF migrations: PASS/FAIL
+  - gitleaks: PASS/FAIL
+  → RESULTADO GLOBAL: PASS/FAIL (exit code)
 ```
 
-Solo tras PASS en todos los pasos aplicables → `git add` → `git commit` → `git push`.
+Solo tras **RESULTADO GLOBAL: PASS** → `git add` → `git commit` → `git push`.

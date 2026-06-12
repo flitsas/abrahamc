@@ -197,7 +197,7 @@ gh pr merge <N> --merge   # o --squash según estrategia acordada
 
 ## Push directo a `develop` (sin PR)
 
-Si el usuario pide **push directo** (sin `gh pr create`), el agente implementador debe cumplir **`.cursor/rules/pre-push-gate.mdc`** antes del push: `dotnet test`, gitleaks y resumen PASS/FAIL al usuario. Las pre-condiciones de merge (#5–#6) aplican igual en CI post-push.
+Si el usuario pide **push directo** (sin `gh pr create`), el agente implementador debe ejecutar **`pnpm run validate:pre-push:win`** (o `validate:pre-push`) **completo** — Prettier, lint, typecheck, tests/build FE, backend, EF, gitleaks — y mostrar plantilla PASS/FAIL de **`.cursor/rules/pre-push-gate.mdc`**. **Exit code 0 obligatorio**; prohibido `git push` si falla. Las pre-condiciones de merge (#5–#6) aplican igual en CI post-push.
 
 ---
 

@@ -2,11 +2,13 @@
 
 ## Puerta pre-push (push directo a `develop` o sin PR)
 
-Si haces **commit + push** sin PR, CI corre **después** del push. Ejecuta **antes** (misma sesión):
+Si haces **commit + push** sin PR, CI corre **después** del push. Ejecuta **antes** (misma sesión) **un solo comando** (paridad CI completa):
 
-1. `dotnet test services/core-api/tests/Flit.Api.Tests/Flit.Api.Tests.csproj` (si tocaste backend)
-2. `gitleaks detect --source . --config .gitleaks.toml --no-git --redact --exit-code 1`
-3. Atajo: `pnpm run validate:pre-push` (Linux/macOS/Git Bash) o `pnpm run validate:pre-push:win` (Windows)
+- `pnpm run validate:pre-push:win` (Windows) o `pnpm run validate:pre-push` (Linux/macOS)
+- Incluye: Prettier (`format:check`), lint, typecheck, tests/build frontend, `dotnet test`/build, EF migrations, gitleaks
+- **Exit code 0 obligatorio** antes de `git push`
+
+Bloqueo mecánico opcional: `pnpm run hooks:install` (activa `.githooks/pre-push`).
 
 Regla Cursor obligatoria: `.cursor/rules/pre-push-gate.mdc`.
 

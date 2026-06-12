@@ -9,7 +9,10 @@ import {
   useProcedureTypes,
 } from "../api/parametrizacion.api.js";
 import { useCanManageParametrizacion } from "../hooks/useCanManageParametrizacion.js";
-import { parseApiFieldErrors, type FieldErrors } from "../lib/parseApiFieldErrors.js";
+import {
+  parseApiFieldErrors,
+  type FieldErrors,
+} from "../lib/parseApiFieldErrors.js";
 import { validateMinActiveDataEdges } from "../lib/pipelineValidation.js";
 import { GradientButton } from "../../../shared/components/flit/GradientButton.js";
 import { EmptyState } from "../../../shared/components/ui/EmptyState.js";
@@ -39,9 +42,7 @@ export function PipelineModelerTab({
   const familiesQuery = useCatalogFamilies();
   const typesQuery = useProcedureTypes(tenantId);
   const matrixQuery = useProcedureMatrix(
-    selectedType
-      ? { tenantId, typeCode: selectedType.code }
-      : null,
+    selectedType ? { tenantId, typeCode: selectedType.code } : null,
     Boolean(selectedType),
   );
   const patchEdge = usePatchProcedureEdge();
@@ -127,7 +128,9 @@ export function PipelineModelerTab({
     setStatusMessage(null);
 
     if (!pipelineValidation.isValid) {
-      setFieldErrors({ edges: pipelineValidation.message ?? "Pipeline inválido." });
+      setFieldErrors({
+        edges: pipelineValidation.message ?? "Pipeline inválido.",
+      });
       return;
     }
 
@@ -163,7 +166,9 @@ export function PipelineModelerTab({
     setStatusMessage(null);
 
     if (!pipelineValidation.isValid) {
-      setFieldErrors({ edges: pipelineValidation.message ?? "Pipeline inválido." });
+      setFieldErrors({
+        edges: pipelineValidation.message ?? "Pipeline inválido.",
+      });
       return;
     }
 
@@ -246,7 +251,9 @@ export function PipelineModelerTab({
           </h2>
           <p
             className={`text-xs font-semibold ${
-              pipelineValidation.isValid ? "text-flit-green" : "text-flit-danger"
+              pipelineValidation.isValid
+                ? "text-flit-green"
+                : "text-flit-danger"
             }`}
             role="status"
           >
@@ -283,88 +290,90 @@ export function PipelineModelerTab({
           ))}
         </ol>
 
-        {selectedType ? (
-          canManage && (
-            <GradientButton
-              type="button"
-              className="mt-4 !h-10 !w-auto !px-6 !text-sm"
-              disabled={patchEdge.isPending || !pipelineValidation.isValid}
-              onClick={() => void handleSaveExistingPipeline()}
-            >
-              {patchEdge.isPending ? "Guardando…" : "Guardar pipeline"}
-            </GradientButton>
-          )
-        ) : (
-          canManage && (
-            <form
-              className="mt-6 grid gap-4 border-t border-flit-draft/10 pt-4 sm:grid-cols-2"
-              onSubmit={handleCreateType}
-              noValidate
-            >
-              <FieldInput
-                id="type-code"
-                label="Código tipo"
-                name="code"
-                value={newTypeCode}
-                error={fieldErrors.code}
-                onChange={setNewTypeCode}
-              />
-              <FieldInput
-                id="type-slug"
-                label="Slug"
-                name="slug"
-                value={newTypeSlug}
-                error={fieldErrors.slug}
-                onChange={setNewTypeSlug}
-              />
-              <FieldInput
-                id="type-name"
-                label="Nombre"
-                name="name"
-                value={newTypeName}
-                error={fieldErrors.name}
-                onChange={setNewTypeName}
-              />
-              <div>
-                <label
-                  htmlFor="type-family"
-                  className="text-sm font-semibold text-flit-blueDark"
-                >
-                  Familia
-                </label>
-                <select
-                  id="type-family"
-                  name="familyCode"
-                  value={newTypeFamily}
-                  onChange={(event) => setNewTypeFamily(event.target.value)}
-                  className="mt-1 w-full rounded-[10px] border border-flit-draft/30 px-3 py-2 text-sm"
-                  aria-invalid={Boolean(fieldErrors.familyCode)}
-                >
-                  <option value="">Seleccione…</option>
-                  {families.map((family) => (
-                    <option key={family.id} value={family.code}>
-                      {family.name}
-                    </option>
-                  ))}
-                </select>
-                {fieldErrors.familyCode && (
-                  <p className="mt-1 text-xs text-flit-danger" role="alert">
-                    {fieldErrors.familyCode}
-                  </p>
-                )}
-              </div>
-              <div className="sm:col-span-2">
-                <GradientButton
-                  type="submit"
-                  className="!h-10 !w-auto !px-6 !text-sm"
-                  disabled={createType.isPending || !pipelineValidation.isValid}
-                >
-                  {createType.isPending ? "Creando…" : "Crear tipo con pipeline"}
-                </GradientButton>
-              </div>
-            </form>
-          )
-        )}
+        {selectedType
+          ? canManage && (
+              <GradientButton
+                type="button"
+                className="mt-4 !h-10 !w-auto !px-6 !text-sm"
+                disabled={patchEdge.isPending || !pipelineValidation.isValid}
+                onClick={() => void handleSaveExistingPipeline()}
+              >
+                {patchEdge.isPending ? "Guardando…" : "Guardar pipeline"}
+              </GradientButton>
+            )
+          : canManage && (
+              <form
+                className="mt-6 grid gap-4 border-t border-flit-draft/10 pt-4 sm:grid-cols-2"
+                onSubmit={handleCreateType}
+                noValidate
+              >
+                <FieldInput
+                  id="type-code"
+                  label="Código tipo"
+                  name="code"
+                  value={newTypeCode}
+                  error={fieldErrors.code}
+                  onChange={setNewTypeCode}
+                />
+                <FieldInput
+                  id="type-slug"
+                  label="Slug"
+                  name="slug"
+                  value={newTypeSlug}
+                  error={fieldErrors.slug}
+                  onChange={setNewTypeSlug}
+                />
+                <FieldInput
+                  id="type-name"
+                  label="Nombre"
+                  name="name"
+                  value={newTypeName}
+                  error={fieldErrors.name}
+                  onChange={setNewTypeName}
+                />
+                <div>
+                  <label
+                    htmlFor="type-family"
+                    className="text-sm font-semibold text-flit-blueDark"
+                  >
+                    Familia
+                  </label>
+                  <select
+                    id="type-family"
+                    name="familyCode"
+                    value={newTypeFamily}
+                    onChange={(event) => setNewTypeFamily(event.target.value)}
+                    className="mt-1 w-full rounded-[10px] border border-flit-draft/30 px-3 py-2 text-sm"
+                    aria-invalid={Boolean(fieldErrors.familyCode)}
+                  >
+                    <option value="">Seleccione…</option>
+                    {families.map((family) => (
+                      <option key={family.id} value={family.code}>
+                        {family.name}
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.familyCode && (
+                    <p className="mt-1 text-xs text-flit-danger" role="alert">
+                      {fieldErrors.familyCode}
+                    </p>
+                  )}
+                </div>
+                <div className="sm:col-span-2">
+                  <GradientButton
+                    type="submit"
+                    className="!h-10 !w-auto !px-6 !text-sm"
+                    disabled={
+                      createType.isPending || !pipelineValidation.isValid
+                    }
+                  >
+                    {createType.isPending
+                      ? "Creando…"
+                      : "Crear tipo con pipeline"}
+                  </GradientButton>
+                </div>
+              </form>
+            )}
       </section>
     </div>
   );
@@ -464,7 +473,11 @@ function FieldInput({
         aria-describedby={error ? `${id}-error` : undefined}
       />
       {error && (
-        <p id={`${id}-error`} className="mt-1 text-xs text-flit-danger" role="alert">
+        <p
+          id={`${id}-error`}
+          className="mt-1 text-xs text-flit-danger"
+          role="alert"
+        >
           {error}
         </p>
       )}

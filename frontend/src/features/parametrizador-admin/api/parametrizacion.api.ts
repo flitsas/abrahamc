@@ -145,7 +145,10 @@ export async function fetchProcedureRules(
 
 export async function simulateProcedureRules(payload: SimulateRulesRequest) {
   const body = simulateRulesRequestSchema.parse(payload);
-  const { data } = await apiClient.post("/procedures-config/rules/simulate", body);
+  const { data } = await apiClient.post(
+    "/procedures-config/rules/simulate",
+    body,
+  );
   return simulateRulesResponseSchema.parse(data);
 }
 
@@ -167,7 +170,10 @@ export function useCatalogEdges(enabled = true) {
   });
 }
 
-export function useProcedureTypes(tenantId: string | undefined, enabled = true) {
+export function useProcedureTypes(
+  tenantId: string | undefined,
+  enabled = true,
+) {
   return useQuery({
     queryKey: tenantId
       ? queryKeys.parametrizadorAdmin.types(tenantId)

@@ -1,17 +1,25 @@
 # Git hooks — puerta pre-push mecánica
 
-Activa el hook **una vez** en tu máquina (el agente no modifica `git config` por política FLIT):
+Bloquea **`git push`** si falla la validación completa (Prettier, lint, typecheck, tests, build FE, backend, EF, gitleaks).
+
+## Activar (una vez por máquina)
+
+```powershell
+pnpm run hooks:install
+```
+
+Equivalente manual:
 
 ```powershell
 git config core.hooksPath .githooks
 ```
 
-En Windows con Git for Windows, renombra o enlaza `pre-push.ps1` → `pre-push` si el shell no ejecuta `.ps1` directamente; alternativa:
+En Windows con Git Bash, el hook `.githooks/pre-push` invoca `scripts/validate-pre-push.sh`. En PowerShell directo, usa `pnpm run validate:pre-push:win` antes de push.
 
-```powershell
-Copy-Item .githooks/pre-push.ps1 .githooks/pre-push -Force
-```
+## Qué valida
 
-Tras activarlo, **todo** `git push` ejecuta `pnpm run validate:pre-push` automáticamente.
+Paridad con CI — ver `.cursor/rules/pre-push-gate.mdc` y `scripts/validate-pre-push.ps1`.
 
-Regla Cursor equivalente: `.cursor/rules/pre-push-gate.mdc`.
+**Importante:** sin `core.hooksPath`, solo la regla del agente aplica; con hooks activos, el push **no puede** omitir Prettier ni lint.
+
+Regla Cursor: `.cursor/rules/pre-push-gate.mdc`.

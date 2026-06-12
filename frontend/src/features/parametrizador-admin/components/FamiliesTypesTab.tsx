@@ -1,5 +1,8 @@
 import { useState } from "react";
-import type { CatalogFamily, ProcedureTypeSummary } from "../api/parametrizacion.schemas.js";
+import type {
+  CatalogFamily,
+  ProcedureTypeSummary,
+} from "../api/parametrizacion.schemas.js";
 import {
   useCatalogFamilies,
   useCreateCatalogFamily,
@@ -7,7 +10,10 @@ import {
   useProcedureTypes,
 } from "../api/parametrizacion.api.js";
 import { useCanManageParametrizacion } from "../hooks/useCanManageParametrizacion.js";
-import { parseApiFieldErrors, type FieldErrors } from "../lib/parseApiFieldErrors.js";
+import {
+  parseApiFieldErrors,
+  type FieldErrors,
+} from "../lib/parseApiFieldErrors.js";
 import { GradientButton } from "../../../shared/components/flit/GradientButton.js";
 import { EmptyState } from "../../../shared/components/ui/EmptyState.js";
 import { ErrorState } from "../../../shared/components/ui/ErrorState.js";
@@ -134,8 +140,12 @@ export function FamiliesTypesTab({
               className="flex items-center justify-between py-3 text-sm"
             >
               <div>
-                <p className="font-semibold text-flit-blueDark">{family.name}</p>
-                <p className="font-mono text-xs text-flit-muted">{family.code}</p>
+                <p className="font-semibold text-flit-blueDark">
+                  {family.name}
+                </p>
+                <p className="font-mono text-xs text-flit-muted">
+                  {family.code}
+                </p>
               </div>
               {canManage && (
                 <button
@@ -238,7 +248,10 @@ function FamilyForm({
   return (
     <form className="space-y-3" onSubmit={onSubmit} noValidate>
       <div>
-        <label htmlFor="family-code" className="text-sm font-semibold text-flit-blueDark">
+        <label
+          htmlFor="family-code"
+          className="text-sm font-semibold text-flit-blueDark"
+        >
           Código
         </label>
         <input
@@ -251,13 +264,20 @@ function FamilyForm({
           aria-describedby={fieldErrors.code ? "family-code-error" : undefined}
         />
         {fieldErrors.code && (
-          <p id="family-code-error" className="mt-1 text-xs text-flit-danger" role="alert">
+          <p
+            id="family-code-error"
+            className="mt-1 text-xs text-flit-danger"
+            role="alert"
+          >
             {fieldErrors.code}
           </p>
         )}
       </div>
       <div>
-        <label htmlFor="family-name" className="text-sm font-semibold text-flit-blueDark">
+        <label
+          htmlFor="family-name"
+          className="text-sm font-semibold text-flit-blueDark"
+        >
           Nombre
         </label>
         <input
@@ -270,7 +290,11 @@ function FamilyForm({
           aria-describedby={fieldErrors.name ? "family-name-error" : undefined}
         />
         {fieldErrors.name && (
-          <p id="family-name-error" className="mt-1 text-xs text-flit-danger" role="alert">
+          <p
+            id="family-name-error"
+            className="mt-1 text-xs text-flit-danger"
+            role="alert"
+          >
             {fieldErrors.name}
           </p>
         )}

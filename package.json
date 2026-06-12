@@ -18,6 +18,8 @@
     "validate:ef-migrations:win": "powershell -ExecutionPolicy Bypass -File scripts/validate-ef-migrations.ps1",
     "validate:pre-push": "bash scripts/validate-pre-push.sh",
     "validate:pre-push:win": "powershell -ExecutionPolicy Bypass -File scripts/validate-pre-push.ps1",
+    "hooks:install": "powershell -ExecutionPolicy Bypass -File scripts/install-git-hooks.ps1",
+    "hooks:install:unix": "bash scripts/install-git-hooks.sh",
     "migrate": "dotnet ef database update --project services/core-api/src/Flit.Infrastructure/Flit.Infrastructure.csproj --startup-project services/core-api/src/Flit.Api/Flit.Api.csproj",
     "lint": "pnpm --filter @flit/frontend lint",
     "format:check": "pnpm --filter @flit/frontend format:check",

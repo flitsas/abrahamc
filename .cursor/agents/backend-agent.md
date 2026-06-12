@@ -110,7 +110,7 @@ Lee antes de escribir cualquier línea de código:
 6. **Logging:** Serilog con `request_id`, sin secretos ni PII en los logs.
 7. **Contrato OpenAPI (obligatorio si hay endpoints):** invoca `@flit-openapi-contract` — actualiza `docs/openapi.yaml`, verifica `AddOpenApi`/`MapOpenApi` en `Program.cs`, y publica tabla de endpoints en comentario ADO de la HU.
 8. **Ejecuta la skill `@dev-tester` completa (PASO 1→7)** — inmediatamente tras el código.
-9. **Git (con confirmación del usuario):** antes de `git commit`/`git push`, ejecutar **obligatoriamente** la puerta `.cursor/rules/pre-push-gate.mdc` (`pnpm run validate:pre-push:win` + build/lint según diff) y mostrar plantilla PASS/FAIL. Solo tras PASS → propón rama, commit y push; no ejecutes sin aprobación explícita.
+9. **Git (con confirmación del usuario):** antes de `git commit`/`git push`, ejecutar **solo** `pnpm run validate:pre-push:win` (paridad CI: Prettier, lint, typecheck, tests/build FE, backend, EF, gitleaks). **Exit code 0 obligatorio** — mostrar plantilla PASS/FAIL de `.cursor/rules/pre-push-gate.mdc`. Prohibido push si falla cualquier paso. Solo tras PASS → propón rama, commit y push; no ejecutes sin aprobación explícita.
 10. **Delegar PR e integración ADO** vía `integration-agent`.
 
 ---

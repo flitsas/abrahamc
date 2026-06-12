@@ -41,7 +41,13 @@ export const queryKeys = {
     matrix: (tenantId: string, typeCode: string) =>
       ["parametrizador-admin", "matrix", tenantId, typeCode] as const,
     edgeForm: (tenantId: string, typeCode: string, edgeCode: string) =>
-      ["parametrizador-admin", "edge-form", tenantId, typeCode, edgeCode] as const,
+      [
+        "parametrizador-admin",
+        "edge-form",
+        tenantId,
+        typeCode,
+        edgeCode,
+      ] as const,
     rules: (tenantId: string, procedureTypeId: string) =>
       ["parametrizador-admin", "rules", tenantId, procedureTypeId] as const,
   },

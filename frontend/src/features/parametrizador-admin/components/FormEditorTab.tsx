@@ -10,7 +10,10 @@ import {
   useProcedureMatrix,
 } from "../api/parametrizacion.api.js";
 import { useCanManageParametrizacion } from "../hooks/useCanManageParametrizacion.js";
-import { parseApiFieldErrors, type FieldErrors } from "../lib/parseApiFieldErrors.js";
+import {
+  parseApiFieldErrors,
+  type FieldErrors,
+} from "../lib/parseApiFieldErrors.js";
 import { GradientButton } from "../../../shared/components/flit/GradientButton.js";
 import { EmptyState } from "../../../shared/components/ui/EmptyState.js";
 import { ErrorState } from "../../../shared/components/ui/ErrorState.js";
@@ -62,7 +65,9 @@ export function FormEditorTab({ tenantId, selectedType }: FormEditorTabProps) {
   const [fieldType, setFieldType] =
     useState<(typeof FIELD_TYPES)[number]>("text");
   const [fieldRequired, setFieldRequired] = useState(false);
-  const [fieldOptionsJson, setFieldOptionsJson] = useState('["Opción A","Opción B"]');
+  const [fieldOptionsJson, setFieldOptionsJson] = useState(
+    '["Opción A","Opción B"]',
+  );
   const [targetSectionId, setTargetSectionId] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -207,7 +212,11 @@ export function FormEditorTab({ tenantId, selectedType }: FormEditorTabProps) {
 
           {canManage && (
             <>
-              <form className="mt-4 space-y-3" onSubmit={handleCreateSection} noValidate>
+              <form
+                className="mt-4 space-y-3"
+                onSubmit={handleCreateSection}
+                noValidate
+              >
                 <p className="text-xs font-semibold uppercase tracking-wide text-flit-muted">
                   Nueva sección
                 </p>
@@ -234,12 +243,19 @@ export function FormEditorTab({ tenantId, selectedType }: FormEditorTabProps) {
                 </GradientButton>
               </form>
 
-              <form className="mt-6 space-y-3 border-t border-flit-draft/10 pt-4" onSubmit={handleCreateField} noValidate>
+              <form
+                className="mt-6 space-y-3 border-t border-flit-draft/10 pt-4"
+                onSubmit={handleCreateField}
+                noValidate
+              >
                 <p className="text-xs font-semibold uppercase tracking-wide text-flit-muted">
                   Nuevo campo
                 </p>
                 <div>
-                  <label htmlFor="field-section" className="text-sm font-semibold text-flit-blueDark">
+                  <label
+                    htmlFor="field-section"
+                    className="text-sm font-semibold text-flit-blueDark"
+                  >
                     Sección
                   </label>
                   <select
@@ -271,14 +287,19 @@ export function FormEditorTab({ tenantId, selectedType }: FormEditorTabProps) {
                   onChange={setFieldLabel}
                 />
                 <div>
-                  <label htmlFor="field-type" className="text-sm font-semibold text-flit-blueDark">
+                  <label
+                    htmlFor="field-type"
+                    className="text-sm font-semibold text-flit-blueDark"
+                  >
                     Tipo
                   </label>
                   <select
                     id="field-type"
                     value={fieldType}
                     onChange={(event) =>
-                      setFieldType(event.target.value as (typeof FIELD_TYPES)[number])
+                      setFieldType(
+                        event.target.value as (typeof FIELD_TYPES)[number],
+                      )
                     }
                     className="mt-1 w-full rounded-[10px] border border-flit-draft/30 px-3 py-2 text-sm"
                   >
@@ -291,13 +312,18 @@ export function FormEditorTab({ tenantId, selectedType }: FormEditorTabProps) {
                 </div>
                 {fieldType === "select" && (
                   <div>
-                    <label htmlFor="field-options" className="text-sm font-semibold text-flit-blueDark">
+                    <label
+                      htmlFor="field-options"
+                      className="text-sm font-semibold text-flit-blueDark"
+                    >
                       Options JSON
                     </label>
                     <textarea
                       id="field-options"
                       value={fieldOptionsJson}
-                      onChange={(event) => setFieldOptionsJson(event.target.value)}
+                      onChange={(event) =>
+                        setFieldOptionsJson(event.target.value)
+                      }
                       rows={3}
                       className="mt-1 w-full rounded-[10px] border border-flit-draft/30 px-3 py-2 font-mono text-xs"
                     />
@@ -324,7 +350,8 @@ export function FormEditorTab({ tenantId, selectedType }: FormEditorTabProps) {
 
           {sections.length === 0 && (
             <p className="mt-4 text-sm text-flit-muted">
-              No hay secciones en este paso. Cree una sección para agregar campos.
+              No hay secciones en este paso. Cree una sección para agregar
+              campos.
             </p>
           )}
         </section>
@@ -333,7 +360,10 @@ export function FormEditorTab({ tenantId, selectedType }: FormEditorTabProps) {
           aria-labelledby="form-preview-heading"
           className="rounded-flit-card border border-flit-draft/20 bg-flit-card p-4 shadow-flit-card"
         >
-          <h2 id="form-preview-heading" className="text-base font-bold text-flit-blueText">
+          <h2
+            id="form-preview-heading"
+            className="text-base font-bold text-flit-blueText"
+          >
             Vista previa
           </h2>
           {previewFields.length === 0 ? (
@@ -453,7 +483,11 @@ function FieldInput({ id, label, value, error, onChange }: FieldInputProps) {
         aria-describedby={error ? `${id}-error` : undefined}
       />
       {error && (
-        <p id={`${id}-error`} className="mt-1 text-xs text-flit-danger" role="alert">
+        <p
+          id={`${id}-error`}
+          className="mt-1 text-xs text-flit-danger"
+          role="alert"
+        >
           {error}
         </p>
       )}

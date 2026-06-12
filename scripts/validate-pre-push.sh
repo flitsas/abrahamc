@@ -1,18 +1,34 @@
 #!/usr/bin/env bash
-# Valida localmente lo mínimo que Security Scan y Core API CI exigen antes de push.
+# Puerta pre-push FLIT — paridad con CI (frontend + backend + EF + gitleaks).
+# Un solo script; no omitir pasos manuales. Ver .cursor/rules/pre-push-gate.mdc
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-echo "==> dotnet test (Flit.Api.Tests)"
-dotnet test services/core-api/tests/Flit.Api.Tests/Flit.Api.Tests.csproj
+run_step() {
+  echo ""
+  echo "==> $1"
+  shift
+  "$@"
+}
 
-echo "==> dotnet build (Release)"
-dotnet build services/core-api/Flit.slnx --configuration Release
+run_step "pnpm format:check (Prettier — mismo paso que CI)" pnpm -r format:check
+run_step "pnpm lint (ESLint)" pnpm -r lint
+run_step "pnpm typecheck (TypeScript)" pnpm -r typecheck
+run_step "pnpm test — @flit/frontend (Vitest)" pnpm --filter @flit/frontend test
+run_step "pnpm build — @flit/frontend" pnpm --filter @flit/frontend build
 
-bash "$(dirname "$0")/validate-ef-migrations.sh"
+run_step "dotnet test (Flit.Api.Tests)" \
+  dotnet test services/core-api/tests/Flit.Api.Tests/Flit.Api.Tests.csproj
 
+run_step "dotnet build (Release)" \
+  dotnet build services/core-api/Flit.slnx --configuration Release
+
+run_step "EF migrations (integridad + list)" \
+  bash "$(dirname "$0")/validate-ef-migrations.sh"
+
+echo ""
 echo "==> gitleaks (archivos trackeados por git — mismo alcance que CI)"
 SCAN_DIR="$(mktemp -d)"
 trap 'rm -rf "$SCAN_DIR"' EXIT
@@ -33,4 +49,5 @@ else
   exit 1
 fi
 
-echo "==> Pre-push validation OK"
+echo ""
+echo "==> Pre-push validation OK (frontend + backend + EF + gitleaks)"
