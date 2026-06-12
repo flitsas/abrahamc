@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Flit.Modules.Procedures.Domain;
 using Flit.Modules.Procedures.Ports;
 using Flit.SharedKernel;
@@ -47,14 +48,15 @@ public static class GetProcedureQueryResults
         var records = await queryResultRepo.ListByInstanceAsync(query.TenantId, query.ProcedureInstanceId, ct);
         var items = records.Select(r =>
         {
+            var (mandatory, circuitOpen) = ReadSnapshotMetadata(r.Result);
             var succeeded = string.Equals(r.Status, "ok", StringComparison.OrdinalIgnoreCase);
             return new QueryResultItem(
                 r.QueryConnectorCode,
                 r.EdgeRole,
                 r.Status,
                 succeeded,
-                CircuitOpen: false,
-                Mandatory: false,
+                circuitOpen,
+                mandatory,
                 r.IntegrationCallId,
                 r.Id);
         }).ToList();
@@ -64,5 +66,14 @@ public static class GetProcedureQueryResults
 
         return Result<Response, QueryError>.Success(
             new Response(query.ProcedureInstanceId, items, canContinue));
+    }
+
+    public static (bool Mandatory, bool CircuitOpen) ReadSnapshotMetadata(JsonElement result)
+    {
+        var mandatory = result.TryGetProperty("mandatory", out var mandatoryProp)
+                        && mandatoryProp.ValueKind == JsonValueKind.True;
+        var circuitOpen = result.TryGetProperty("circuitOpen", out var circuitProp)
+                          && circuitProp.ValueKind == JsonValueKind.True;
+        return (mandatory, circuitOpen);
     }
 }

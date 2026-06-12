@@ -167,6 +167,13 @@ public static class RunProcedureExternalQueries
             ? execResult.Value!.ResponseBody ?? JsonSerializer.SerializeToElement(new { status })
             : JsonSerializer.SerializeToElement(new { error = execResult.Error!.Message });
 
+        var circuitOpen = execResult.IsSuccess && execResult.Value!.CircuitOpen;
+        var storedResult = JsonSerializer.SerializeToElement(new
+        {
+            mandatory = plan.IsMandatory,
+            circuitOpen,
+            data = resultBody,
+        });
         var snapshotId = Guid.CreateVersion7();
         var respondedAt = DateTimeOffset.UtcNow;
 
@@ -179,7 +186,7 @@ public static class RunProcedureExternalQueries
                 plan.EdgeCode,
                 Source: plan.ConnectorCode,
                 status,
-                resultBody,
+                storedResult,
                 requestedAt,
                 respondedAt,
                 execResult.IsSuccess ? execResult.Value!.CallId : null,
@@ -192,7 +199,7 @@ public static class RunProcedureExternalQueries
             plan.EdgeCode,
             status,
             succeeded,
-            execResult.IsSuccess && execResult.Value!.CircuitOpen,
+            circuitOpen,
             plan.IsMandatory,
             execResult.IsSuccess ? execResult.Value!.CallId : null,
             snapshotId);

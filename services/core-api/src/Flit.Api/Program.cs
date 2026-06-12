@@ -112,6 +112,11 @@ builder.Services.AddSingleton<Flit.Modules.Rbac.Ports.IPermissionsCache,
 
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<ExternalQueryCircuitBreaker>();
+builder.Services.AddSingleton<Flit.Api.Services.InMemoryProcedureQueryJobStoreAdapter>();
+builder.Services.AddSingleton<Flit.Api.Services.ProcedureQueryBackgroundRunner>();
+builder.Services.AddSingleton<Flit.Modules.Procedures.Ports.IProcedureQueryJobStore>(sp =>
+    sp.GetRequiredService<Flit.Api.Services.ProcedureQueryBackgroundRunner>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<Flit.Api.Services.ProcedureQueryBackgroundRunner>());
 
 var verifikToken = builder.Configuration["Verifik:ApiToken"]
     ?? Environment.GetEnvironmentVariable("VERIFIK_API_TOKEN");
