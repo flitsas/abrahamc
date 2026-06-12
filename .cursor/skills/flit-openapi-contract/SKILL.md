@@ -57,7 +57,9 @@ dotnet build src/Flit.Api/Flit.Api.csproj
 curl -s http://localhost:3030/openapi/v1.json | head
 ```
 
-Local: `http://localhost:3030/swagger` (Swagger UI) · spec JSON: `/openapi/v1.json`
+Local (core-api directo — siempre funciona): `http://localhost:3030/swagger` · spec: `/openapi/v1.json`
+
+Local vía SPA (`pnpm dev`): `http://localhost:5173/swagger` solo si `frontend/vite.config.ts` proxea `/swagger` y `/openapi` a `:3030`. Sin ese proxy, `:5173/swagger` carga el React SPA y redirige a `/login`.
 
 **QA — probar endpoints protegidos en Swagger:**
 1. `POST /api/v1/auth/login` (sin Authorize) → copiar `accessToken`

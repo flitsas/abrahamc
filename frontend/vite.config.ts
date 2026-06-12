@@ -20,6 +20,15 @@ export default defineConfig({
         target: 'http://localhost:3030',
         changeOrigin: true,
       },
+      // Swagger UI + OpenAPI JSON viven en core-api (3030), no en el SPA
+      '/swagger': {
+        target: 'http://localhost:3030',
+        changeOrigin: true,
+      },
+      '/openapi': {
+        target: 'http://localhost:3030',
+        changeOrigin: true,
+      },
     },
   },
 })
