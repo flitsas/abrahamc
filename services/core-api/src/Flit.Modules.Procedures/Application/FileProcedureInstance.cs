@@ -34,7 +34,21 @@ public static class FileProcedureInstance
         }
 
         var now = command.OverrideNow ?? DateTimeOffset.UtcNow;
-        var referenceNumber = GenerateReferenceNumber(now);
+        var referenceContext = await repository.ResolveReferenceContextAsync(
+            command.TenantId,
+            command.TrafficAgencyId,
+            command.ProcedureTypeCode,
+            ct);
+        var sequence = await repository.GetNextSequenceAsync(
+            command.TenantId,
+            command.ProcedureTypeId,
+            command.TrafficAgencyId,
+            ct);
+        var referenceNumber = GenerateReferenceNumber(
+            referenceContext.TypeCode,
+            referenceContext.TenantCode,
+            referenceContext.OtCode,
+            sequence);
 
         var instance = new ProcedureInstance(
             Id: Guid.NewGuid(),
@@ -60,13 +74,12 @@ public static class FileProcedureInstance
     }
 
     /// <summary>
-    /// Genera un número de radicación único con formato <c>TRA-YYYYMMDD-XXXXXX</c>
-    /// (6 dígitos hex en mayúsculas desde un GUID nuevo). La unicidad final es garantizada
-    /// por el constraint <c>uq_procedure_instances_reference_number</c> en la BD.
+    /// Genera número compuesto <c>{TYPE}-{TENANT}_{OT}-{SEQ}</c> (#10079).
     /// </summary>
-    public static string GenerateReferenceNumber(DateTimeOffset now)
-    {
-        var hex = Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
-        return $"TRA-{now:yyyyMMdd}-{hex}";
-    }
+    public static string GenerateReferenceNumber(
+        string typeCode,
+        string tenantCode,
+        string otCode,
+        int sequence) =>
+        ProcedureReferenceFormatter.GenerateReferenceNumber(typeCode, tenantCode, otCode, sequence);
 }
